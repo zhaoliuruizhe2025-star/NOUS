@@ -1,0 +1,17 @@
+{
+  "appName": "NOUS",
+  "languageLabel": "Language",
+  "languages": {
+    "en": "English",
+    "zh-CN": "简体中文"
+  },
+  "loop": "Remember · Connect · Reflect",
+  "placeholderTitle": "A second perspective, quietly taking shape.",
+  "placeholderBody": "This is the beginning of a private, local space for noticing how your experiences connect over time.",
+  "database": {
+    "initializing": "Preparing local storage…",
+    "ready": "Local storage is ready",
+    "error": "Local storage could not be initialized"
+  }
+}
+

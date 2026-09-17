@@ -1,0 +1,145 @@
+:root {
+  color: #26312e;
+  background: #f2f0e9;
+  font-family:
+    Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% 18%, rgb(255 255 255 / 70%), transparent 35%),
+    #f2f0e9;
+}
+
+button,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 30px clamp(24px, 6vw, 72px) 56px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.wordmark {
+  color: #1e2926;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.28em;
+}
+
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #66726d;
+  font-size: 0.82rem;
+}
+
+.language-selector select {
+  min-width: 112px;
+  border: 1px solid #cbd0c9;
+  border-radius: 999px;
+  padding: 7px 30px 7px 12px;
+  color: #33423d;
+  background: rgb(255 255 255 / 68%);
+}
+
+.language-selector select:focus-visible {
+  outline: 2px solid #6f867d;
+  outline-offset: 2px;
+}
+
+.landing {
+  width: min(680px, 100%);
+  margin: clamp(100px, 22vh, 180px) auto 0;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 24px;
+  color: #718078;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.landing h1 {
+  margin: 0;
+  color: #23302c;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: clamp(2rem, 5.8vw, 4.1rem);
+  font-weight: 400;
+  line-height: 1.12;
+}
+
+.placeholder-copy {
+  max-width: 550px;
+  margin: 28px auto 0;
+  color: #59665f;
+  font-size: clamp(0.98rem, 2vw, 1.12rem);
+  line-height: 1.75;
+}
+
+.database-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 42px 0 0;
+  color: #748079;
+  font-size: 0.78rem;
+}
+
+.database-status span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #aab2ad;
+}
+
+.database-status--ready span {
+  background: #668b77;
+}
+
+.database-status--error {
+  color: #8b625d;
+}
+
+.database-status--error span {
+  background: #a86f67;
+}
+
+@media (max-width: 560px) {
+  .app-header {
+    align-items: flex-start;
+  }
+
+  .language-selector {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+}
+

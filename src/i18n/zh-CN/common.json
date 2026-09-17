@@ -1,0 +1,17 @@
+{
+  "appName": "NOUS",
+  "languageLabel": "语言",
+  "languages": {
+    "en": "English",
+    "zh-CN": "简体中文"
+  },
+  "loop": "记住 · 连接 · 反思",
+  "placeholderTitle": "从另一个角度，慢慢看见自己。",
+  "placeholderBody": "这里将成为一个只属于你的本地空间，帮助你看见经历如何在时间中彼此连接。",
+  "database": {
+    "initializing": "正在准备本地存储…",
+    "ready": "本地存储已就绪",
+    "error": "本地存储初始化失败"
+  }
+}
+

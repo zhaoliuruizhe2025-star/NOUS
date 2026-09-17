@@ -1,0 +1,95 @@
+# NOUS
+
+> NOUS helps you step outside your own perspective and see the person you have been becoming.
+
+## North Star
+
+NOUS is designed to help people develop a second perspective on themselves.
+
+It remembers, connects, and reflects the user's own experiences so that patterns that are difficult to see from inside everyday life can become visible.
+
+NOUS is a mirror, not an authority: it does not claim to know the user's "true self," and it does not build unconsented psychological profiles of other people.
+
+## Status
+
+NOUS is in the specification and prototype stage. The first milestone is **v0.1 — Constructing a Self**.
+
+NOUS is not intended to tell a person who they are, diagnose mental-health conditions, or decide how they should live. It aims to build an inspectable model from a user's own observations, beliefs, values, memories, thoughts, emotions, and decisions, and then help the user reflect on patterns and tensions over time.
+
+## Product vision
+
+NOUS is designed around five long-term capabilities:
+
+1. **Mind Mirror** — show how the user's thinking, values, and recurring interpretations change over time.
+2. **Inner Map / Belief Graph** — represent important beliefs, values, and their relationships.
+3. **Philosophy Engine** — surface tensions and alternative interpretations without declaring one worldview correct.
+4. **Life Paths** — explore trade-offs among possible choices without recommending a choice.
+5. **Digital Self** — experimentally test how well an explicit self-model can anticipate responses to new situations.
+
+A cross-cutting **Care Layer** takes priority whenever analysis would be inappropriate or potentially harmful.
+
+## Core product principles
+
+- Local-first and privacy-first.
+- No external LLM or AI API is required for core functionality.
+- User-facing conclusions must be explainable.
+- NOUS describes and reflects; it does not prescribe life decisions.
+- Historical self-model data is preserved rather than silently overwritten.
+- Care takes priority over analysis when a user appears to be in significant distress.
+- The UI supports English and Simplified Chinese.
+- Internal code, identifiers, schemas, rules, and logs use English.
+
+See `docs/` and `AGENTS.md` before implementing features.
+
+## Planned technical direction
+
+- Desktop application
+- Tauri 2
+- React + TypeScript UI
+- Rust application/core layer
+- SQLite local storage
+- Windows-first development, with macOS and Linux as supported targets after the Windows alpha stabilizes
+
+The exact boundary between TypeScript and Rust may evolve after the initial scaffold. Do not redesign that boundary without documenting the reason first.
+
+## Development
+
+Prerequisites are listed in `docs/ARCHITECTURE.md`. From the repository root:
+
+```powershell
+npm install
+npm run tauri:dev
+```
+
+Quality checks:
+
+```powershell
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run tauri:check
+npm run tauri:build
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+The Tauri SQL plugin initializes `nous.db` under the operating system's application configuration directory for `com.nous.desktop`. Task 001 creates only a technical `app_metadata` table plus the plugin's migration bookkeeping; it does not create Self Model data.
+
+## Repository documents
+
+- `AGENTS.md` — instructions for coding agents.
+- `docs/PRODUCT.md` — product definition and user experience.
+- `docs/DECISIONS.md` — accepted design decisions that agents should not casually reopen.
+- `docs/PRINCIPLES.md` — non-negotiable design principles.
+- `docs/SELF_MODEL.md` — conceptual model of the person.
+- `docs/ARCHITECTURE.md` — technical architecture and security boundary.
+- `docs/SAFETY.md` — Care Layer and high-risk interaction behavior.
+- `docs/RESPONSE_POLICY.md` — chooses between relief, practical help, reflection, decision support, philosophy, and care.
+- `docs/FRAMEWORKS.md` — psychology/philosophy framework library rules.
+- `docs/VOICE_AND_I18N.md` — tone, bilingual UI, and output style.
+- `docs/ROADMAP.md` — staged implementation plan.
+- `CODEX_TASK_001.md` — first implementation task.
+
+## License
+
+A public open-source license has not yet been selected. Keep the repository private until the owner explicitly decides to publish it.

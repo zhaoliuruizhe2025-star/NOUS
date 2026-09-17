@@ -1,0 +1,21 @@
+{
+  "name": "NOUS specification package",
+  "version": "0.1-spec",
+  "files": [
+    "AGENTS.md",
+    "CODEX_TASK_001.md",
+    "README.md",
+    "START_HERE.md",
+    "docs/ARCHITECTURE.md",
+    "docs/DECISIONS.md",
+    "docs/FRAMEWORKS.md",
+    "docs/PRINCIPLES.md",
+    "docs/PRODUCT.md",
+    "docs/RESPONSE_POLICY.md",
+    "docs/ROADMAP.md",
+    "docs/SAFETY.md",
+    "docs/SELF_MODEL.md",
+    "docs/VOICE_AND_I18N.md"
+  ],
+  "next_action": "Read START_HERE.md, open the NOUS folder in Codex, and execute CODEX_TASK_001.md only."
+}
