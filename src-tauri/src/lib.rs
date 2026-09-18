@@ -1,5 +1,7 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+pub mod domain;
+
 const DATABASE_URL: &str = "sqlite:nous.db";
 
 fn migrations() -> Vec<Migration> {
