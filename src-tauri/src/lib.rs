@@ -1,8 +1,9 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
 pub mod domain;
+mod persistence;
 
-const DATABASE_URL: &str = "sqlite:nous.db";
+pub(crate) const DATABASE_URL: &str = "sqlite:nous.db";
 
 fn migrations() -> Vec<Migration> {
     vec![Migration {
@@ -21,6 +22,10 @@ pub fn run() {
                 .add_migrations(DATABASE_URL, migrations())
                 .build(),
         )
+        .setup(|app| {
+            persistence::install_shared_sqlite_pool(app)?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running NOUS");
 }
