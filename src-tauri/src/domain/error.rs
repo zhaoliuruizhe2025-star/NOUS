@@ -2,6 +2,7 @@ use std::{error::Error, fmt};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValidationError {
+    ZeroRevisionNumber,
     EmptyText {
         field: &'static str,
     },
@@ -16,6 +17,7 @@ pub enum ValidationError {
 impl fmt::Display for ValidationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::ZeroRevisionNumber => write!(formatter, "revision_number must be positive"),
             Self::EmptyText { field } => write!(formatter, "{field} must not be empty"),
             Self::OutOfRange {
                 field,

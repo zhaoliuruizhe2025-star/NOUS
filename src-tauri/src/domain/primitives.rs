@@ -50,6 +50,10 @@ define_id!(ObservationId, "observation_id");
 define_id!(SituationId, "situation_id");
 define_id!(ThoughtId, "thought_id");
 define_id!(EmotionId, "emotion_id");
+define_id!(BeliefId, "belief_id");
+define_id!(BeliefRevisionId, "belief_revision_id");
+define_id!(ValueId, "value_id");
+define_id!(ValueRevisionId, "value_revision_id");
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
@@ -130,3 +134,37 @@ macro_rules! define_percentage {
 
 define_percentage!(EmotionIntensity, "emotion_intensity");
 define_percentage!(ThoughtConfidence, "thought_confidence");
+define_percentage!(BeliefEndorsement, "belief_endorsement");
+define_percentage!(ValueImportance, "value_importance");
+
+/// A positive local revision number; it does not establish history-wide sequencing or uniqueness.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "u32", into = "u32")]
+pub struct RevisionNumber(u32);
+
+impl RevisionNumber {
+    pub fn new(value: u32) -> Result<Self, ValidationError> {
+        if value == 0 {
+            return Err(ValidationError::ZeroRevisionNumber);
+        }
+        Ok(Self(value))
+    }
+
+    pub fn value(self) -> u32 {
+        self.0
+    }
+}
+
+impl TryFrom<u32> for RevisionNumber {
+    type Error = ValidationError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl From<RevisionNumber> for u32 {
+    fn from(value: RevisionNumber) -> Self {
+        value.0
+    }
+}
