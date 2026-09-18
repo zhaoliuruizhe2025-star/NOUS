@@ -12,7 +12,7 @@ NOUS is a mirror, not an authority: it does not claim to know the user's "true s
 
 ## Status
 
-NOUS is in the specification and prototype stage. The first milestone is **v0.1 — Constructing a Self**.
+Task 001 is complete at checkpoint `455e929`, providing the runnable desktop scaffold. The repository is now at the **v0.2 master planning checkpoint**; Task 002 (the first narrow Self Model domain slice) is next and has not started.
 
 NOUS is not intended to tell a person who they are, diagnose mental-health conditions, or decide how they should live. It aims to build an inspectable model from a user's own observations, beliefs, values, memories, thoughts, emotions, and decisions, and then help the user reflect on patterns and tensions over time.
 
@@ -28,6 +28,14 @@ NOUS is designed around five long-term capabilities:
 
 A cross-cutting **Care Layer** takes priority whenever analysis would be inappropriate or potentially harmful.
 
+The product loop is:
+
+```text
+Remember -> Connect -> Reflect -> Self-awareness
+```
+
+NOUS should be useful before it tries to be insightful. Where appropriate, responses may use `Action -> Explanation -> Reflection` as one strategy, with interaction behavior adapted to the person's current state rather than only the literal sentence.
+
 ## Core product principles
 
 - Local-first and privacy-first.
@@ -38,6 +46,8 @@ A cross-cutting **Care Layer** takes priority whenever analysis would be inappro
 - Care takes priority over analysis when a user appears to be in significant distress.
 - The UI supports English and Simplified Chinese.
 - Internal code, identifiers, schemas, rules, and logs use English.
+- Content understanding and interaction strategy are separate, testable concerns.
+- The current UI is replaceable functional scaffolding; visual identity is deferred to a dedicated UI/UX phase.
 
 See `docs/` and `AGENTS.md` before implementing features.
 
@@ -79,16 +89,22 @@ The Tauri SQL plugin initializes `nous.db` under the operating system's applicat
 
 - `AGENTS.md` — instructions for coding agents.
 - `docs/PRODUCT.md` — product definition and user experience.
+- `docs/MASTER_PLAN.md` — engineering roadmap from the foundation through Private Beta.
+- `docs/TASK_SYSTEM.md` — task creation, scope, review, completion, and checkpoints.
+- `docs/BACKLOG.md` — active roadmap, later candidates, post-beta features, and research ideas.
 - `docs/DECISIONS.md` — accepted design decisions that agents should not casually reopen.
 - `docs/PRINCIPLES.md` — non-negotiable design principles.
 - `docs/SELF_MODEL.md` — conceptual model of the person.
 - `docs/ARCHITECTURE.md` — technical architecture and security boundary.
 - `docs/SAFETY.md` — Care Layer and high-risk interaction behavior.
 - `docs/RESPONSE_POLICY.md` — chooses between relief, practical help, reflection, decision support, philosophy, and care.
+- `docs/INTERACTION_MODEL.md` — adapts response form to the user's current conversational state.
 - `docs/FRAMEWORKS.md` — psychology/philosophy framework library rules.
 - `docs/VOICE_AND_I18N.md` — tone, bilingual UI, and output style.
 - `docs/ROADMAP.md` — staged implementation plan.
-- `CODEX_TASK_001.md` — first implementation task.
+- `docs/EXPRESSION_LAB.md` — explicitly post-beta expression-support epic.
+- `CODEX_TASK_001.md` — completed historical scaffold task.
+- `CODEX_TASK_002.md` — next task; narrow domain model and focused tests only.
 
 ## License
 

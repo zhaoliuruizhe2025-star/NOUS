@@ -59,6 +59,27 @@ Preferred conceptual layers:
 
 Care/safety is cross-cutting and can block higher-level reasoning/simulation behavior.
 
+### 3.1 Content and interaction separation
+
+User-response behavior has two distinct responsibilities:
+
+```text
+Input + relevant history
+        |              |
+        v              v
+Content understanding  Interaction state signals
+        |              |
+        v              v
+Semantic result        Interaction strategy
+        |              |
+        +-------> Response composition
+```
+
+- **Content understanding** identifies situations, observations, thoughts, emotions, relevant history, and possible meaning.
+- **Interaction strategy** selects response mode and adjusts verbosity, questions, warmth, directness, initiative, solution priority, and reflection depth.
+
+They should exchange explicit data and remain independently testable. Interaction state is temporary and must not automatically mutate the durable Self Model. The Care Layer can override ordinary strategy and block higher-risk output.
+
 ## 4. Repository direction
 
 The initial scaffold may resemble:
@@ -84,6 +105,8 @@ NOUS/
 ```
 
 Do not force this exact tree if Tauri's generated project structure requires minor differences. Preserve the conceptual separation.
+
+The Task 001 UI is temporary scaffolding. Final visual identity, navigation, typography, color, animation, and composition remain frozen until a dedicated UI/UX phase. Domain and application logic must not depend on temporary visual components.
 
 ## 5. Database
 
@@ -198,3 +221,7 @@ The first implementation milestone is intentionally small:
 7. no Self Engine logic is implemented yet.
 
 After that milestone is reviewed, domain implementation begins.
+
+Status: **COMPLETE** at checkpoint `455e929 Complete NOUS Task 001 desktop scaffold`.
+
+The next planned implementation task is Task 002, limited to the first six domain entities, validation, and focused tests. The planning roadmap does not itself authorize later layers, migrations, or UI changes.

@@ -68,3 +68,47 @@ User-facing UI supports English and Simplified Chinese.
 Internal code/schema identifiers use English.
 
 Status: **Accepted**
+
+## D009 — Useful before insightful
+
+Immediate usefulness takes priority over depth. `Action -> Explanation -> Reflection` is one available strategy where appropriate, not a universal template or required response format. Presence, philosophy, or care may require a different structure.
+
+Status: **Accepted**
+
+## D010 — Separate content understanding and interaction strategy
+
+NOUS separates what the user's material may mean from how it should respond now. Interaction strategy adapts verbosity, question frequency, warmth, directness, initiative, solution priority, and reflection depth using non-clinical conversational-state signals.
+
+Status: **Accepted**
+
+## D011 — Temporary UI boundary
+
+The current interface is functional scaffolding. A dedicated Product Experience / UI-UX milestone must occur before Private Beta and cover final visual identity, interaction flows, information hierarchy, bilingual typography, and replacement of temporary surfaces. Domain logic must remain independent of the scaffold.
+
+Status: **Accepted**
+
+## D012 — Governed task hierarchy
+
+Development follows:
+
+```text
+Vision -> Architecture -> Epics -> Phases/Milestones -> Tasks -> Git checkpoints
+```
+
+Completed work remains historical. Changes require new explicit tasks. A task is complete only after implementation, passing checks, architectural review, user review, and an approved Git checkpoint.
+
+Status: **Accepted**
+
+## D013 — Private Beta before public release
+
+NOUS will be evaluated with a small informed Private Beta before any public/open-source release. The Product Experience / UI-UX and Care / Safety implementation milestones are pre-beta gates. Beta feedback and safety/privacy review precede public release planning.
+
+Status: **Accepted**
+
+## D014 — Future features remain outside the active path
+
+Relationship Lens is perspective expansion, not third-party mind-reading. Expression Lab is a post-beta feature that helps users express feelings they already have rather than fabricate them. Digital Self remains future experimental work. These remain deferred unless explicitly promoted and assigned approved tasks.
+
+Life Paths is deferred from the first Private Beta as a scope reduction, not removed from the long-term NOUS product vision.
+
+Status: **Accepted**

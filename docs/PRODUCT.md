@@ -16,13 +16,14 @@ If the feature primarily labels, judges, or defines the user, it should be redes
 
 NOUS should act as a mirror, not an authority.
 
-### Remember · Connect · Reflect
+### Remember · Connect · Reflect · Self-awareness
 
 The core product loop is:
 
 1. **Remember** — preserve what the user thought, felt, valued, experienced, and chose over time.
 2. **Connect** — reveal meaningful relationships and recurring patterns among those records.
 3. **Reflect** — present those patterns back to the user in a form that supports a more detached, observer-like view of themselves.
+4. **Self-awareness** — help the user notice, question, and revise their own understanding while remaining the final interpreter.
 
 Prediction, philosophical analysis, and life-path simulation are secondary capabilities built on this foundation.
 
@@ -157,6 +158,16 @@ NOUS should separate:
 
 This separation enables reflection without automatically treating interpretations as facts.
 
+NOUS must also respond to the person's current conversational state, not merely the literal sentence. Content understanding and interaction strategy are separate systems: one determines what the material may mean; the other adjusts how much to say, how many questions to ask, how direct or warm to be, whether to take initiative, and whether action or reflection should come first.
+
+The baseline is **useful before insightful**. One available strategy, where appropriate, is:
+
+```text
+Action -> Explanation -> Reflection
+```
+
+This sequence yields to presence when sadness or loneliness calls for it, to deeper exploration when invited, and to grounded safety behavior in distress or crisis. See `INTERACTION_MODEL.md`.
+
 ## 9. Output hierarchy
 
 Before choosing the output form, NOUS first decides what kind of help is appropriate: immediate relief, practical help, reflection, decision support, philosophical exploration, or care.
@@ -177,6 +188,8 @@ Optional structured data, scores, confidence, rule IDs, and technical reasoning.
 
 Users should never be forced to read Level 3 to benefit from NOUS.
 
+Abstract reasoning should be translated into concrete human situations. When relevant history exists, examples should come from the user's actual records rather than generic invented scenarios, while remaining tentative and traceable.
+
 ## 10. User agency
 
 The user can:
@@ -190,9 +203,11 @@ The user can:
 
 A self-model that cannot be challenged by the person it models is contrary to the product.
 
-## 11. Success criteria for v0.1
+## 11. Foundation and release sequence
 
-v0.1 succeeds if a user can:
+The current interface is temporary functional scaffolding. Final visual identity is frozen until a dedicated UI/UX phase; domain work must remain independent of the scaffold.
+
+The first usable foundation succeeds if a user can:
 - create local records;
 - distinguish situations, thoughts, emotions, beliefs, values, memories, and decisions;
 - preserve revisions/history;
@@ -201,4 +216,6 @@ v0.1 succeeds if a user can:
 - switch between English and Simplified Chinese;
 - run the app offline with no external AI/API dependency.
 
-v0.1 does not need to predict future choices or provide a mature philosophy engine.
+The foundation does not need to predict future choices or provide a mature philosophy engine.
+
+A small Private Beta precedes any public or open-source release. Post-beta features such as Relationship Lens, Expression Lab, and Digital Self remain in `BACKLOG.md` until explicitly promoted into the active plan.

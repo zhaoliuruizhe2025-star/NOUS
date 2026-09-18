@@ -43,6 +43,8 @@ Internal interaction states may include:
 
 These states describe **how the application should interact**, not a medical classification of the user.
 
+They are part of interaction strategy, not durable identity. Content understanding and response delivery remain separate, and uncertainty must be preserved.
+
 The exact detection logic is a future task and must be validated carefully before relying on it.
 
 ## 5. Tone behavior
@@ -69,12 +71,14 @@ Avoid:
 > "CRISIS DETECTED. This content is not permitted."
 
 Prefer:
-> "You sound like you're carrying a lot right now. We don't need to analyze your whole life in this moment."
+> "You do not need to explain or solve your whole life right now. Stay with the next safe step."
 
 When risk appears more immediate:
 > "If you feel you may act on these thoughts, try not to stay alone. Reach out to someone you trust or contact local emergency/crisis support now."
 
 Exact final care copy must be human-reviewed in each supported language.
+
+Care responses must not rely on generic template openings such as "calm down," "don't worry," or "sounds like you...". Use specific, grounded language appropriate to the situation. Ask only the questions necessary to clarify immediate safety or the next supportive action.
 
 ## 7. Care is not hidden persuasion
 
@@ -109,3 +113,15 @@ Sensitive care-related data remains subject to the same local-first principles a
 Do not add remote crisis monitoring, automatic reporting, or silent third-party notification as a side effect of v0.1.
 
 Any future feature that shares data externally requires an explicit separate design and informed user action.
+
+## 10. Pre-beta implementation milestone
+
+Before Private Beta, separately scoped and approved tasks must implement and validate:
+
+- Care routing behavior;
+- distress/crisis interaction behavior;
+- human-reviewed care copy in English and Simplified Chinese;
+- safety-focused tests, including ambiguous and mixed-state cases;
+- precedence of Care over ordinary reflection, philosophy, simulation, and prediction.
+
+This specification does not implement those systems by itself.

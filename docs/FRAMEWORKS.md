@@ -54,6 +54,8 @@ NOUS must not:
 - declare the framework with the most supporting rules the winner;
 - convert multiple traditions into a single "correct philosophy" score.
 
+User-facing framework explanations should translate abstraction into the concrete situation being explored. When relevant evidence exists in the user's own history, use that evidence instead of inventing a generic personal example, and keep the connection open to correction.
+
 ## 5. Source discipline
 
 Every framework entry must have a traceable source.

@@ -10,10 +10,11 @@ Before modifying code:
 2. Read `docs/PRINCIPLES.md`.
 3. Read `docs/ARCHITECTURE.md`.
 4. Read `docs/DECISIONS.md`.
-5. Read `docs/RESPONSE_POLICY.md` when implementing user-response behavior.
-6. Read the document relevant to the requested feature.
-7. Read the current task specification.
-6. Inspect existing tests and code before introducing new abstractions.
+5. Read `docs/MASTER_PLAN.md` and `docs/TASK_SYSTEM.md`.
+6. Read `docs/RESPONSE_POLICY.md` and `docs/INTERACTION_MODEL.md` when implementing user-response behavior.
+7. Read the document relevant to the requested feature.
+8. Read the current task specification.
+9. Inspect existing tests and code before introducing new abstractions.
 
 Do not infer the product from a short task prompt when the repository documentation already defines it.
 
@@ -25,6 +26,8 @@ Do not infer the product from a short task prompt when the repository documentat
 - Do not introduce a runtime LLM/API dependency without explicit approval.
 - Do not add cloud sync, telemetry, analytics, remote logging, advertisements, or account systems without explicit approval.
 - Prefer small, reviewable changes.
+- Treat `docs/BACKLOG.md` as non-authorizing: listed future work must not enter an active task silently.
+- Do not change completed task history. Changes to completed work require a new explicit task.
 
 If a requested implementation conflicts with project documents, stop and report the conflict rather than silently choosing a new direction.
 
@@ -88,6 +91,8 @@ Prefer immediate, low-risk practical relief when the user is simply frustrated, 
 Do not update the durable Self Model from a casual statement without sufficient evidence and/or user confirmation.
 
 See `docs/RESPONSE_POLICY.md`.
+
+Content understanding and interaction strategy are separate concerns. Interaction behavior must adapt its verbosity, question frequency, warmth, directness, initiative, solution priority, and reflection depth without treating temporary state as a clinical diagnosis. See `docs/INTERACTION_MODEL.md`.
 
 ## 5.2 Third-party modeling boundary
 
@@ -153,6 +158,8 @@ See `docs/SAFETY.md`.
 - Do not mix translated strings directly into business logic.
 - Do not mechanically translate nuanced care/reflection copy.
 - Reflection may be literary; care responses must become simpler, warmer, and more grounded.
+- Do not use generic openings such as "calm down," "don't worry," or "sounds like you..." as template responses.
+- Translate abstract reasoning into concrete human situations, using relevant examples from the user's own history when available.
 
 See `docs/VOICE_AND_I18N.md`.
 
@@ -188,3 +195,21 @@ After each task, report:
 4. anything not completed;
 5. any architectural or safety concern discovered;
 6. suggested next task, without implementing it unless asked.
+
+## 12. Planning hierarchy and Definition of Done
+
+Use this hierarchy:
+
+```text
+Vision -> Architecture -> Epics -> Phases/Milestones -> Tasks -> Git checkpoints
+```
+
+A roadmap item is not implementation authorization. A task is complete only after:
+
+1. implementation is complete;
+2. tests/checks pass;
+3. architecture and product boundaries are respected;
+4. the user reviews the result;
+5. an approved Git checkpoint is created.
+
+Task 001 is historical completed work at `455e929`. Do not rewrite it. Task 002 is the next planned implementation task and must retain its approved narrow scope.

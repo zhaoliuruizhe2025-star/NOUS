@@ -2,62 +2,45 @@
 
 ## What this package is
 
-This folder contains the initial product and engineering specification for NOUS.
+This repository contains the product, engineering, and task specifications for NOUS together with the completed Task 001 desktop scaffold.
 
-Do not ask Codex to "build the whole app" yet. The first task is deliberately limited to creating a safe, runnable development scaffold.
-
-## Step 1 — Create the local repository folder
-
-Create a folder for the project, for example:
+Task 001 is historical completed work at checkpoint:
 
 ```text
-C:\Users\<you>\Projects\NOUS
+455e929 Complete NOUS Task 001 desktop scaffold
 ```
 
-Copy the contents of this specification package into that folder so that `AGENTS.md`, `README.md`, `CODEX_TASK_001.md`, and `docs/` are at the repository root.
+The current checkpoint is documentation-only master planning. Task 002 is next and must not begin until the planning checkpoint is reviewed and approved.
+
+## Step 1 — Use the canonical repository
+
+Work only in:
+
+```text
+D:\Dev\NOUS
+```
 
 ## Step 2 — Open the folder in your coding environment
 
 Open the NOUS folder in the Codex/Work coding environment you plan to use.
 
-## Step 3 — Give Codex this instruction
+## Step 3 — Identify the approved task
 
 ```text
-Read AGENTS.md and every document required by CODEX_TASK_001.md before making any changes.
+Read `AGENTS.md`, `docs/MASTER_PLAN.md`, `docs/TASK_SYSTEM.md`, and the current approved task specification before changing code.
 
-Then execute CODEX_TASK_001.md exactly as written.
-
-Important:
-- NOUS's North Star is to help the current user gain a second perspective on themselves.
-- NOUS models the current user, not unconsenting third parties.
-- Do not redesign the product, Self Model, privacy boundary, or safety principles.
-- Do not implement anything beyond Task 001.
-- Do not add cloud services, telemetry, runtime LLM/API dependencies, or runtime network calls.
-- Do not silently install system-wide dependencies or change Windows configuration.
-
-If a required Windows development prerequisite is missing, stop before making system-level changes and tell me exactly what I need to install or configure.
-
-When finished, run the checks required by Task 001 and give me a concise completion report. Then stop.
+Do not infer implementation authority from the roadmap or backlog. Execute only an explicitly approved task on its dedicated branch.
 ```
 
-## Step 4 — Expected outcome
+## Step 4 — Current expected outcome
 
-If your environment is already ready, Codex should:
-- scaffold a Tauri 2 + React + TypeScript desktop app;
-- create English / Simplified Chinese localization skeletons;
-- initialize local SQLite capability;
-- run/check the project;
-- report what it changed.
+For the current planning checkpoint, only Markdown planning/specification files should change. No application source, migration, UI redesign, Task 002 implementation, commit, or merge is part of this checkpoint.
 
-If a prerequisite is missing, Codex should stop and tell you what is missing instead of silently changing Windows.
+After approval, Task 002 remains limited to `SelfSubject`, `PersonReference`, `Observation`, `Situation`, `Thought`, `Emotion`, validation, and focused tests.
 
 ## Step 5 — Do not continue automatically
 
-After Task 001, stop.
-
-Run NOUS yourself and review the result before starting Task 002.
-
-Bring the Codex completion report, screenshots, errors, or unfamiliar files back to the normal Chat conversation for explanation/review.
+Every task stops for user review. A task is complete only after implementation, passing checks, architectural review, user review, and an approved Git checkpoint.
 
 ## Important
 
@@ -67,4 +50,4 @@ The `.md` files are the project's written specification and standing instruction
 - Git history;
 - task-specific prompts.
 
-After the scaffold is verified, initialize Git (if Codex has not already done so) and make a clean first commit before implementing the Self Model.
+Future and post-beta ideas remain in `docs/BACKLOG.md` until explicitly promoted into the active roadmap and assigned a new task.

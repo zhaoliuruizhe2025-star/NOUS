@@ -1,0 +1,30 @@
+The NOUS repository is now located at:
+
+D:\Dev\NOUS
+
+Execute `CODEX_TASK_002.md` exactly as written.
+
+Begin only after the v0.2 master planning documentation has been reviewed and approved. Do not execute Task 002 from an uncommitted planning branch.
+
+Before making any changes:
+
+- Confirm you are working in `D:\Dev\NOUS`, not the old C-drive workspace.
+- Read every document listed under Required Reading in `CODEX_TASK_002.md`.
+- Verify Git is clean on `main`.
+- Verify the Task 001 checkpoint `455e929 Complete NOUS Task 001 desktop scaffold` is present.
+- Verify the approved v0.2 documentation checkpoint is present after Task 001.
+- If project sandbox write access is required, request only narrowly scoped access to `D:\Dev\NOUS`.
+
+Important constraints:
+
+- Create and work only on `task/002-self-model-foundation`.
+- Do not modify `main` directly.
+- Do not commit or merge automatically.
+- Implement only SelfSubject, PersonReference, Observation, Situation, Thought, Emotion, and their focused tests.
+- Do not add database migrations or persistence in this task.
+- Do not implement Belief, Value, Memory, Decision, prediction, reasoning, Relationship Lens, Care detection, or final UI.
+- Do not make further branding/visual-design decisions.
+- Do not introduce runtime LLM/API calls, telemetry, cloud services, or runtime network dependencies.
+- Do not psychologically profile or predict unconsenting third parties.
+
+When the implementation and checks are complete, give the completion report required by `CODEX_TASK_002.md` and stop.

@@ -1,10 +1,10 @@
 # NOUS Roadmap
 
-The roadmap intentionally separates a stable foundation from ambitious prediction features.
+This is the concise phase view. `MASTER_PLAN.md` is the authoritative engineering sequence, `TASK_SYSTEM.md` governs execution, and `BACKLOG.md` prevents future ideas from silently entering active work.
 
 ## Phase 0 — Specification
 
-Status: current.
+Status: **complete**. Task 001 delivered the approved scaffold at checkpoint `455e929`.
 
 Goals:
 - product definition;
@@ -18,6 +18,12 @@ Exit criteria:
 - documents reviewed;
 - first scaffold task approved.
 
+## Current planning checkpoint
+
+Status: **documentation in progress**.
+
+The v0.2 master planning checkpoint aligns product, architecture, interaction, roadmap, task governance, and backlog boundaries. It does not implement Task 002.
+
 ## Phase 1 — v0.1 "Constructing a Self"
 
 Goal: represent a changing person locally and transparently.
@@ -30,13 +36,20 @@ Goal: represent a changing person locally and transparently.
 - tests/lint/typecheck/build commands defined.
 - no runtime network dependency.
 
+Status: **COMPLETE** at `455e929`. This is historical completed work. Future changes require a new explicit task.
+
 ### 1B. Domain model
-Implement:
+Task 002 is the next task and is limited to:
 - SelfSubject / PersonReference privacy boundary;
 - Observation
 - Situation
 - Thought
 - Emotion
+
+Task 002 also includes validation and focused tests. It does not include persistence, migrations, or UI.
+
+Later explicitly scoped tasks may add:
+
 - Belief + revisions
 - Value + revisions
 - Memory
@@ -65,7 +78,17 @@ Implement:
 
 v0.1 explicitly excludes advanced prediction.
 
-## Phase 2 — v0.2 "Mirror"
+The current UI remains temporary functional scaffolding. Final visual identity is frozen until a dedicated UI/UX phase.
+
+## Phase 2 — Remember, Connect, and Interact
+
+- reliable structured capture and revision history;
+- explicit evidence links and inspectable reasoning traces;
+- response routing and the separate adaptive interaction strategy in `INTERACTION_MODEL.md`;
+- useful-before-insightful behavior and optional `Action -> Explanation -> Reflection` strategy where appropriate;
+- concrete grounding in the user's real situations and history when available.
+
+## Phase 3 — Mirror
 
 - temporal comparison;
 - recurring patterns;
@@ -73,7 +96,7 @@ v0.1 explicitly excludes advanced prediction.
 - user correction/rejection of interpretations;
 - "Why?" evidence view.
 
-## Phase 3 — v0.3 "Reasoning"
+## Phase 4 — Reasoning
 
 - Belief Graph;
 - explicit relationship rules;
@@ -82,7 +105,39 @@ v0.1 explicitly excludes advanced prediction.
 - structured reasoning traces;
 - first small, curated framework rules.
 
-## Phase 4 — v0.4 "Paths"
+## Phase 5 — Product Experience / UI-UX
+
+- replace the Task 001 temporary scaffold;
+- establish final visual identity;
+- design approved interaction flows and information hierarchy;
+- establish bilingual typography and layout behavior;
+- validate usability while keeping domain logic independent of presentation.
+
+This dedicated phase must be completed before Private Beta and requires separately approved tasks.
+
+## Phase 6 — Care / Safety implementation
+
+- Care routing behavior;
+- distress/crisis interaction behavior;
+- human-reviewed English and Simplified Chinese care copy;
+- safety-focused tests;
+- verified Care precedence over ordinary reflection, philosophy, simulation, and prediction.
+
+This phase must be completed before Private Beta and requires separately approved tasks.
+
+## Phase 7 — Private Beta
+
+- small, informed, trusted tester group;
+- stable local workflows;
+- privacy and safety review;
+- bilingual care/voice review;
+- feedback without required telemetry or automatic remote collection;
+- known limitations presented clearly;
+- project-owner approval of the beta checkpoint.
+
+Private Beta precedes public/open-source release.
+
+## Long-term capability — Life Paths
 
 - decision scenarios;
 - value trade-offs;
@@ -91,9 +146,9 @@ v0.1 explicitly excludes advanced prediction.
 - false-dichotomy detection where possible;
 - no "best path" output.
 
-## Phase 5 — v0.5 "Digital Self"
+Life Paths is deferred from the first Private Beta. This is scope reduction, not removal from the long-term NOUS product vision.
 
-Research/experimental stage.
+## Future research — Digital Self
 
 - prediction from historical decisions;
 - hold-out/unseen decision tests;
@@ -102,9 +157,9 @@ Research/experimental stage.
 - prediction-vs-actual history;
 - careful evaluation for bias and overconfidence.
 
-Do not start this phase until earlier models and tests are stable.
+Digital Self remains future/deferred work unless explicitly promoted. Do not start it until earlier models and tests are stable.
 
-## Phase 6 — v1.0
+## Phase 8 — Public release planning
 
 - polished bilingual UI;
 - installer/release pipeline;
@@ -125,5 +180,7 @@ Do not start this phase until earlier models and tests are stable.
 - mobile companion;
 - richer framework library;
 - research export tools.
+- Relationship Lens;
+- Expression Lab;
 
-None of these should be implemented merely because they are listed here.
+None of these should be implemented merely because they are listed here. Their canonical status is in `BACKLOG.md`.
