@@ -91,7 +91,7 @@ It excludes persistence, migrations, UI work, inference, response routing, and a
 
 #### Task 003 — Commitments and revision history
 
-Status: **PROPOSED; design ready for user review, implementation not authorized**
+Status: **PROPOSED; executable specification prepared, pending owner review and approval; not READY or implementation-authorized**
 
 Scope:
 
@@ -101,7 +101,7 @@ Scope:
 - `ValueRevision`;
 - required identifiers, bounded user-entered endorsement/importance values, positive revision-number validation, concrete user-authored revision origins, validation, serialization, and focused tests.
 
-It excludes Evidence, Memory, Decision, Outcome, persistence, migrations, reasoning, UI, and all inference. Cross-revision uniqueness and strict sequencing are Task 004 history/persistence/application responsibilities unless a separately approved aggregate abstraction is introduced. See `TASK_003_DESIGN.md`.
+It excludes Evidence, Memory, Decision, Outcome, persistence, migrations, reasoning, UI, and all inference. Cross-revision uniqueness and strict sequencing are Task 004 history/persistence/application responsibilities unless a separately approved aggregate abstraction is introduced. See `TASK_003_DESIGN.md` and `CODEX_TASK_003.md`.
 
 #### Task 004 — Persistence foundation (roadmap summary only)
 
@@ -284,5 +284,5 @@ implementation complete
 - Task 001: **COMPLETE** at `455e929`.
 - v0.2 master planning checkpoint: **COMPLETE** at `8d9770d`.
 - Task 002: **COMPLETE** at `e324852`.
-- Task 003: **PROPOSED; design ready for user review, implementation not authorized**.
+- Task 003: **PROPOSED; executable specification prepared, pending owner review and approval; not READY or implementation-authorized**.
 - Task 004 and later: **roadmap summaries only; not authorized for implementation**.

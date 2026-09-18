@@ -4,7 +4,7 @@
 
 Task 003 is the next proposed domain-model task after the completed Task 002 foundation. It defines durable, user-owned commitments and preserves their change over time without introducing persistence, inference, or a reasoning engine.
 
-Task 003 is a design-ready proposal, not implementation authorization. A separate CODEX_TASK_003.md implementation specification may be created only after the owner approves this design and its starting checkpoint.
+This approved design is translated into `CODEX_TASK_003.md`. Task 003 remains proposed and does not become READY or implementation-authorized until the owner reviews and approves that specification and its starting checkpoint.
 
 ## 2. Why this work is separate
 
