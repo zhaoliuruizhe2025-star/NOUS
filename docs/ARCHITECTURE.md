@@ -224,4 +224,4 @@ After that milestone is reviewed, domain implementation begins.
 
 Status: **COMPLETE** at checkpoint `455e929 Complete NOUS Task 001 desktop scaffold`.
 
-Task 002 is **COMPLETE** at `e324852 Complete NOUS Task 002 self model foundation`. The next proposed task is Task 003, a Rust-domain-only Belief/Value revision model; it is not implementation-authorized until separately approved. Persistence, migrations, and UI remain later layers.
+Task 002 is **COMPLETE** at `e324852 Complete NOUS Task 002 self model foundation`. Task 003 is **COMPLETE** at `e970138 Complete NOUS Task 003 commitments and revision history`. Persistence, migrations, and UI remain later layers and require separately approved work.

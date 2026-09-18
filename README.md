@@ -12,7 +12,7 @@ NOUS is a mirror, not an authority: it does not claim to know the user's "true s
 
 ## Status
 
-Task 001 is complete at `455e929`, providing the runnable desktop scaffold. Task 002 is complete at `e324852`, providing the first narrow Rust Self Model domain slice. Task 003 (Belief/Value commitments and revision history) is proposed for review; it has not started.
+Task 001 is complete at `455e929`, providing the runnable desktop scaffold. Task 002 is complete at `e324852`, providing the first narrow Rust Self Model domain slice. Task 003 is complete at `e970138`, providing the Belief/Value commitments and revision-history domain model.
 
 NOUS is not intended to tell a person who they are, diagnose mental-health conditions, or decide how they should live. It aims to build an inspectable model from a user's own observations, beliefs, values, memories, thoughts, emotions, and decisions, and then help the user reflect on patterns and tensions over time.
 
@@ -100,6 +100,8 @@ The Tauri SQL plugin initializes `nous.db` under the operating system's applicat
 - `docs/RESPONSE_POLICY.md` — chooses between relief, practical help, reflection, decision support, philosophy, and care.
 - `docs/INTERACTION_MODEL.md` — adapts response form to the user's current conversational state.
 - `docs/FRAMEWORKS.md` — psychology/philosophy framework library rules.
+- `docs/ACADEMIC_FOUNDATION.md` — future framework provenance and humility rules.
+- `docs/ONBOARDING.md` — future Bootstrap Self Model onboarding design.
 - `docs/VOICE_AND_I18N.md` — tone, bilingual UI, and output style.
 - `docs/ROADMAP.md` — staged implementation plan.
 - `docs/EXPRESSION_LAB.md` — explicitly post-beta expression-support epic.

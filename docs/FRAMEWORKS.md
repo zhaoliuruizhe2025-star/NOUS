@@ -6,6 +6,8 @@ NOUS may eventually use ideas from psychology, philosophy, ethics, and decision 
 
 The Framework Library must not become a pile of quotations or an authority engine that decides how a person should live.
 
+It is the future Academic Foundation: personal history provides context, and academic frameworks provide structure. Neither alone has authority over the person. See `ACADEMIC_FOUNDATION.md` for the product rules.
+
 ## 2. Framework categories
 
 At minimum distinguish:
@@ -16,6 +18,8 @@ At minimum distinguish:
 - `ETHICAL_FRAMEWORK`
 - `DECISION_THEORY`
 - `USER_DEFINED_FRAMEWORK`
+
+The library must also distinguish interpretive psychological models and contested historical theories from empirical findings. A therapeutic framework, philosophical lens, and normative ethical framework each carry different kinds of warrant.
 
 These categories should not be treated as equivalent forms of evidence.
 
@@ -74,6 +78,8 @@ Store:
 - brief necessary quotations only when legally appropriate;
 - citations.
 
+Prefer modern reviews, systematic reviews, meta-analyses, and contemporary evidence for empirical claims where available. Classic works are not automatically validated because they are classic.
+
 ## 6. Psychological humility
 
 A theoretical or therapeutic concept may help organize reflection but must not be used to diagnose a user.
@@ -90,3 +96,5 @@ For v0.1:
 - focus first on Self Model correctness.
 
 Framework content should be added incrementally and reviewed.
+
+When a substantive psychological interpretation actually relies on an academic framework, normal conversation briefly names that framework. Do not name theories merely to create rhetorical authority, and do not turn the response into a lecture or bibliography. Detailed source/provenance remains internal or expandable until a separately approved surface exists. This document authorizes no framework implementation.

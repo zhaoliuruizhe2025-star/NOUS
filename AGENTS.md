@@ -212,4 +212,4 @@ A roadmap item is not implementation authorization. A task is complete only afte
 4. the user reviews the result;
 5. an approved Git checkpoint is created.
 
-Task 001 is historical completed work at `455e929`; Task 002 is historical completed work at `e324852`. Do not rewrite either task history. Task 003 is proposed and must not begin without an approved bounded task specification.
+Task 001 is historical completed work at `455e929`; Task 002 is historical completed work at `e324852`; Task 003 is historical completed work at `e970138`. Do not rewrite their history. Task 004 and later must not begin without approved bounded task specifications.

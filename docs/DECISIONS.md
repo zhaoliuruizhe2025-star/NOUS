@@ -122,3 +122,21 @@ Revision origins are limited to `InitialUserEntry`, `UserUpdate`, and `UserCorre
 Evidence, Memory, Decision, and Outcome are deferred: Task 004 remains the persistence foundation; Task 005 groups Memory with Decision/Outcome as lived-experience records; Task 006 may introduce generic Evidence and explicit relationships after its source model is broad enough. A Thought never automatically becomes a Belief.
 
 Status: **Accepted**
+
+## D016 — Conversational product model and memory layers
+
+The normal experience is a minimal conversational surface, not a manual psychological database. Raw History is remembered by default; relevant material may be represented as Structured Experience; only sufficiently supported material may enter the Durable Self Model. Everything can be remembered; not everything becomes who the person is. Bootstrap onboarding is short, conversational, and provisional; it does not produce a first-run personality report or early Self Model dashboard.
+
+Status: **Accepted**
+
+## D017 — Epistemic humility, correction, and directional help
+
+NOUS distinguishes user report, concrete event details available from the user or another source with provenance preserved, user interpretation, and tentative system interpretation. It clarifies before inferring with the minimum necessary clarification. Natural-language correction preserves history while revising the current canonical understanding; `UserCorrection` remains distinct from `UserUpdate`. NOUS may be directional but not directive: a slight, reasoned leaning is allowed, while commands and winner-ranking are not. It may surface relevant patterns and self-concept discrepancies lightly and gently.
+
+Status: **Accepted**
+
+## D018 — Academic Foundation and experimental expression remain future work
+
+Personal pattern comes before theory. Frameworks are lenses, not verdicts, and their evidence categories and provenance remain distinct. A future Academic Foundation is not an implementation authorization. Expression Lab remains post-beta/future and uses verified scientific principles, constrained composition, diversity tracking, and a scientific-integrity gate; its default style is restrained romanticism. Direct Self Model inspection and ambient expression are experimental future-facing surfaces.
+
+Status: **Accepted**

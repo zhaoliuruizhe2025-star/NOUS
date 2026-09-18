@@ -45,6 +45,8 @@ The Product Experience / UI-UX milestone must occur before Private Beta. It will
 - bilingual English/Simplified Chinese typography and layout behavior;
 - replacement of temporary navigation, forms, and verification surfaces.
 
+The approved design direction is a short NOUS logo opening animation followed by a highly minimal, calm, Apple-like conversational surface: a short natural prompt and one main input. Normal use must not resemble a form, dashboard, personality test, or manual psychological-record database. This is product direction, not present UI authorization.
+
 The work will be designed separately and may be documented in future files such as:
 
 ```text
@@ -53,6 +55,8 @@ docs/DESIGN_SYSTEM.md
 ```
 
 Until those documents exist, functional scaffolding must remain easy to replace.
+
+Future onboarding follows the same one-question conversational surface; see `ONBOARDING.md`. Full Self Model inspection and the scientific-romantic ambient layer remain experimental/future-facing surfaces, not early core UI.
 
 ## 5. Separation requirement
 

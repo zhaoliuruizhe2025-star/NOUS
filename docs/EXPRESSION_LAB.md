@@ -4,7 +4,7 @@
 
 **POST-BETA / FUTURE.**
 
-Expression Lab is not part of Task 002, the current implementation phase, or the active path to the first Private Beta. It remains in `docs/BACKLOG.md` until explicitly promoted through the task system.
+Expression Lab is not part of the active implementation path or the first Private Beta. It remains in `docs/BACKLOG.md` until explicitly promoted through the task system.
 
 ## 2. Purpose
 
@@ -38,6 +38,31 @@ These are future categories, not approved screens or implementation requirements
 Scientific or mathematical expression lenses must remain conceptually accurate. They must not distort a technical concept merely to make a line sound romantic, profound, or elegant.
 
 Metaphor may make an idea vivid, but technical correctness comes before metaphorical beauty.
+
+**Scientific truth first, metaphor second.** NOUS does not invent science; it generates expression from verified science.
+
+## 3.1 Experimental ambient expression
+
+An experimental ambient layer may place a visually secondary, short scientific-romantic line on the home/initial screen. With little context it may vary across a diverse set of suitable concepts, without competing with the primary prompt and input.
+
+During an active conversation, a line should relate to the current topic when possible, but must not draw a conclusion about the situation or assert another person's hidden state.
+
+The approved default is **restrained romanticism**: a real scientific, mathematical, or technical principle paired with modest human resonance. It is neither generic poetry nor the permanent voice of the main conversation.
+
+Useful concept families can include physics, mathematics, chemistry, biology, and computer science—for example, finite light speed, convergence, activation energy, homeostasis, or version history—but this is not a fixed quote or concept list.
+
+## 3.2 Verified Principle Library
+
+Future expression design should use:
+
+```text
+Verified Principle Library
+  + Constrained Expression Composer
+  + Diversity Tracking
+  + Scientific Integrity Gate
+```
+
+The library should store verified principles, rather than only a tiny fixed quote set or unconstrained generated lines. A future principle card may include concept, field, accurate explanation, safe metaphor directions, common misconceptions, forbidden distortions, and provenance. The composer may vary language from that card according to current topic, user context, emotional/relationship context, language style, and recently used concepts.
 
 ## 4. Personalization boundary
 
@@ -87,3 +112,5 @@ Before implementation, a dedicated design task must address:
 - safe handling of high-stakes messages;
 - local-first generation options and any network implications;
 - evaluation of authenticity without claiming to measure the user's “true” feelings.
+- source verification, integrity review, and diversity evaluation for the principle library;
+- whether ambient expression remains helpful and visually secondary in the minimal home experience.

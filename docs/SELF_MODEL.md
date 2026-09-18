@@ -13,6 +13,27 @@ The model should preserve the difference between:
 - longer-term beliefs/values;
 - system-derived relationships.
 
+### 1.1 Three-layer memory model
+
+Normal conversations are remembered by default. Repeated “Do you want me to remember this?” prompts would add friction inconsistent with NOUS’s purpose. This does not make every statement a durable claim about the user:
+
+1. **Raw History** preserves what the person actually said and the concrete conversation/history as source material.
+2. **Structured Experience** represents lived material as Situation, Observation, Thought, Emotion, and later Memory, Decision, and Outcome.
+3. **Durable Self Model** holds Beliefs, Values, recurring patterns, and long-term tendencies or interpretations.
+
+**Everything can be remembered. Not everything becomes who you are.** A casual statement must not automatically create a Belief, Value, trait, or long-term pattern.
+
+### 1.2 Epistemic layers
+
+For a reported experience, retain separate fields or provenance for:
+
+- what the user explicitly reported;
+- concrete event details available from the user or another source, with provenance preserved;
+- the user’s interpretation;
+- NOUS’s tentative interpretation.
+
+A statement such as “My teacher is deliberately targeting me” is initially a Thought/interpretation, not an Observation. A system-considered emotion or mechanism remains a tentative system interpretation unless the user reports or confirms it.
+
 ## 2. Modeling subject and third-party boundary
 
 ### 2.1 SelfSubject
@@ -403,6 +424,8 @@ Derived patterns must store:
 - timestamp;
 - uncertainty.
 
+Derived patterns must remain provisional and must not turn weak or isolated material into deterministic labels. A strong, relevant pattern may inform a light reminder or hypothesis, but it never overrides the user's correction or agency.
+
 ## 9. User correction
 
 A user can reject or revise system interpretation.
@@ -413,6 +436,16 @@ The system should preserve:
 - the corrected interpretation, if provided.
 
 User correction is valuable evidence and should not be treated as an error condition.
+
+### 9.1 Correction without erasure
+
+Users correct NOUS naturally: “That’s not right,” “You misunderstood me,” or “I cared about fairness, not what they thought of me.” A correction should adjust the current conversation and trigger reconsideration or downgrading of affected assumptions.
+
+Preserve the original history, the prior interpretation, the later correction, and the current canonical understanding. Do not rewrite history as if an earlier representation never existed.
+
+### 9.2 Correction versus change
+
+`UserCorrection` means the recorded representation was inaccurate; it is not psychological change. `UserUpdate` records genuine temporal change. For example, anxiety before an exam followed by preparation and reduced anxiety is an initial state, action, later state, and outcome—not a correction. Historical emotions and psychological states remain valid historical records after a person changes.
 
 ## 10. v0.1 boundary
 

@@ -12,7 +12,7 @@ These outcomes are on the path from the current foundation to Private Beta:
 
 - v0.2 master planning checkpoint;
 - Task 002 Self Model foundation (complete);
-- Task 003 Belief/Value commitments and revision history;
+- Task 003 Belief/Value commitments and revision history (complete at `e970138`);
 - Task 004 local persistence and application services for approved entities;
 - Task 005 Memory, Decision, and Outcome;
 - Task 006 Evidence foundation and explicit relationships;
@@ -69,6 +69,7 @@ Research items require evidence and may never become product features:
 - safe, non-clinical interaction-state adaptation;
 - private, local evaluation of personalized expression style;
 - how much structure improves self-awareness without making the product burdensome.
+- whether, and under what evidence/consent conditions, NOUS should reuse strategies that previously helped the person in similar situations. Decision/Outcome history may support this later, but no active behavior is approved.
 
 ## 6. Promotion rule
 

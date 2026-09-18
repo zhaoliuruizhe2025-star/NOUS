@@ -31,6 +31,14 @@ Prediction, philosophical analysis, and life-path simulation are secondary capab
 
 NOUS is a local-first computational self-modeling application that helps a person develop a clearer second perspective on themselves by organizing and reflecting how beliefs, values, memories, thoughts, emotions, and decisions interact and change over time.
 
+## 2.1 Core experience
+
+The normal experience begins with a short NOUS logo opening animation and a calm, highly minimal conversational surface: a short context-appropriate prompt above one main input. It should feel closer to a composed conversation than a form, dashboard, psychological test, or journaling database.
+
+The person normally says what happened, what they think it meant, and how it felt. NOUS performs deeper structuring; it does not make the person manually maintain Situation, Thought, Emotion, Belief, or Value records.
+
+Normal conversations are remembered by default because the user is intentionally using a system that learns from their life. Remembering a statement is not treating it as a durable psychological truth. See `SELF_MODEL.md`.
+
 ## 3. Problem
 
 People often experience their inner lives as disconnected fragments:
@@ -77,9 +85,9 @@ NOUS is not:
 A calm entry point for current reflection.
 
 Primary actions:
-- record what is on the user's mind;
-- optionally identify situation, thoughts, emotions, and important context;
-- show at most one or two meaningful observations, not a dashboard full of metrics.
+- describe what is on the user's mind in natural language;
+- receive useful conversational help;
+- see at most one or two meaningful observations, not a dashboard full of metrics.
 
 ### 5.2 Mirror
 
@@ -125,7 +133,7 @@ Shows how NOUS currently understands the user:
 - model coverage;
 - prediction history, if enabled in a later version.
 
-The model must always be presented as incomplete and revisable.
+The model must always be presented as incomplete and revisable. Direct Self Model inspection is a later experimental surface, not a core early-product dashboard; the model should first reveal itself through usefulness rather than labels.
 
 ## 7. Long-term capabilities
 
@@ -168,6 +176,8 @@ Action -> Explanation -> Reflection
 
 This sequence yields to presence when sadness or loneliness calls for it, to deeper exploration when invited, and to grounded safety behavior in distress or crisis. See `INTERACTION_MODEL.md`.
 
+When material uncertainty would change the analysis, NOUS clarifies before inferring, using the minimum necessary clarification. It distinguishes user-reported state, concrete event details available from the user or another source with provenance preserved, the user's interpretation, and NOUS’s tentative interpretation. See `INTERACTION_MODEL.md` and `SELF_MODEL.md`.
+
 ## 9. Output hierarchy
 
 Before choosing the output form, NOUS first decides what kind of help is appropriate: immediate relief, practical help, reflection, decision support, philosophical exploration, or care.
@@ -203,9 +213,11 @@ The user can:
 
 A self-model that cannot be challenged by the person it models is contrary to the product.
 
+Natural-language correction must preserve the original history, earlier interpretation, later correction, and current canonical understanding. A correction is not the same as genuine change over time.
+
 ## 11. Foundation and release sequence
 
-The current interface is temporary functional scaffolding. Final visual identity is frozen until a dedicated UI/UX phase; domain work must remain independent of the scaffold.
+The current interface is temporary functional scaffolding. The approved future direction is a minimal, calm, Apple-like conversational experience, but its visual identity is not implementation-authorized until a dedicated UI/UX phase; domain work must remain independent of the scaffold. See `ONBOARDING.md` for the future first-run experience and `UI_BOUNDARY.md` for its implementation boundary.
 
 The first usable foundation succeeds if a user can:
 - create local records;

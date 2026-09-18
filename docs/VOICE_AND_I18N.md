@@ -95,7 +95,7 @@ Characteristics:
 - clear;
 - restrained;
 - trade-off oriented;
-- no recommendation language;
+- may offer a slight, reasoned directional leaning without issuing a command or selecting a winner;
 - uncertainty visible.
 
 ### CARE

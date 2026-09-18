@@ -2,7 +2,7 @@
 
 ## What this package is
 
-This repository contains the product, engineering, and task specifications for NOUS together with the completed Task 001 desktop scaffold and Task 002 Self Model foundation.
+This repository contains the product, engineering, and task specifications for NOUS together with completed Tasks 001–003.
 
 Task 001 is historical completed work at checkpoint:
 
@@ -10,7 +10,7 @@ Task 001 is historical completed work at checkpoint:
 455e929 Complete NOUS Task 001 desktop scaffold
 ```
 
-Task 002 is historical completed work at `e324852 Complete NOUS Task 002 self model foundation`. Task 003 is a proposed design only and must not begin until the owner approves a bounded implementation task.
+Task 002 is historical completed work at `e324852 Complete NOUS Task 002 self model foundation`. Task 003 is historical completed work at `e970138 Complete NOUS Task 003 commitments and revision history`.
 
 ## Step 1 — Use the canonical repository
 
@@ -34,9 +34,9 @@ Do not infer implementation authority from the roadmap or backlog. Execute only 
 
 ## Step 4 — Current expected outcome
 
-For the current architecture-refinement checkpoint, only Markdown planning/specification files should change. No application source, migration, UI redesign, Task 003 implementation, commit, or merge is part of this checkpoint.
+For the current product-model-refinement checkpoint, only Markdown planning/specification files should change. No application source, migration, UI redesign, Task 004 implementation, commit, or merge is part of this checkpoint.
 
-After approval, Task 003 remains limited to `Belief`, `BeliefRevision`, `Value`, `ValueRevision`, their small domain primitives, validation, serialization, and focused tests.
+Task 004 and later require separately approved, bounded task specifications; roadmap summaries do not authorize implementation.
 
 ## Step 5 — Do not continue automatically
 

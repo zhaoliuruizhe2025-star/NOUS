@@ -42,7 +42,7 @@ NOUS is a mirror, not an authority. It should be useful before it tries to be in
 
 ## 4. Master roadmap
 
-Task numbers after Task 002 are planning identifiers, not implementation instructions. Scope must be approved in a dedicated task specification before work begins.
+Task numbers after Task 003 are planning identifiers, not implementation instructions. Scope must be approved in a dedicated task specification before work begins.
 
 ### Phase A — Foundation
 
@@ -91,7 +91,7 @@ It excludes persistence, migrations, UI work, inference, response routing, and a
 
 #### Task 003 — Commitments and revision history
 
-Status: **PROPOSED; executable specification prepared, pending owner review and approval; not READY or implementation-authorized**
+Status: **COMPLETE** at `e970138 Complete NOUS Task 003 commitments and revision history`
 
 Scope:
 
@@ -101,7 +101,7 @@ Scope:
 - `ValueRevision`;
 - required identifiers, bounded user-entered endorsement/importance values, positive revision-number validation, concrete user-authored revision origins, validation, serialization, and focused tests.
 
-It excludes Evidence, Memory, Decision, Outcome, persistence, migrations, reasoning, UI, and all inference. Cross-revision uniqueness and strict sequencing are Task 004 history/persistence/application responsibilities unless a separately approved aggregate abstraction is introduced. See `TASK_003_DESIGN.md` and `CODEX_TASK_003.md`.
+It excluded Evidence, Memory, Decision, Outcome, persistence, migrations, reasoning, UI, and all inference. Cross-revision uniqueness and strict sequencing remain Task 004 history/persistence/application responsibilities unless a separately approved aggregate abstraction is introduced. See `TASK_003_DESIGN.md` and `CODEX_TASK_003.md`.
 
 #### Task 004 — Persistence foundation (roadmap summary only)
 
@@ -215,6 +215,8 @@ The Task 001 UI remains temporary scaffolding until this dedicated phase. This m
 - replacement of temporary forms, navigation, and verification surfaces;
 - usability review without coupling domain logic to presentation.
 
+The future core flow includes minimal conversational capture, default remembering with layered durable-model safeguards, short conversational Bootstrap Self Model onboarding, and no first-run personality report. These are approved design decisions, not authorization to implement UI, onboarding, or response behavior.
+
 This roadmap placement does not authorize UI implementation now. The phase requires separately scoped and approved design and implementation tasks.
 
 ### Phase G — Care / Safety implementation
@@ -284,5 +286,5 @@ implementation complete
 - Task 001: **COMPLETE** at `455e929`.
 - v0.2 master planning checkpoint: **COMPLETE** at `8d9770d`.
 - Task 002: **COMPLETE** at `e324852`.
-- Task 003: **PROPOSED; executable specification prepared, pending owner review and approval; not READY or implementation-authorized**.
+- Task 003: **COMPLETE** at `e970138`.
 - Task 004 and later: **roadmap summaries only; not authorized for implementation**.

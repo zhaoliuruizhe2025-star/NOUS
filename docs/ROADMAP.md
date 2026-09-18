@@ -55,7 +55,7 @@ The next proposed split is:
 - Task 005: Memory, Decision, and Outcome;
 - Task 006: generic Evidence foundation and explicit relationships.
 
-Task 003 is design-ready for user review but is not implementation-authorized. Evidence is deferred until the lived-experience source model is broader; a Thought never automatically becomes a Belief.
+Task 003 is **COMPLETE** at `e970138 Complete NOUS Task 003 commitments and revision history`. Evidence is deferred until the lived-experience source model is broader; a Thought never automatically becomes a Belief.
 
 ### 1C. Persistence
 - schema + migrations;
@@ -112,6 +112,8 @@ The current UI remains temporary functional scaffolding. Final visual identity i
 - design approved interaction flows and information hierarchy;
 - establish bilingual typography and layout behavior;
 - validate usability while keeping domain logic independent of presentation.
+
+The future approved direction is a minimal conversational experience with default remembering, layered durable-model safeguards, short Bootstrap onboarding, no first-run personality report, and later experimental Self/Mirror inspection. These decisions do not authorize implementation.
 
 This dedicated phase must be completed before Private Beta and requires separately approved tasks.
 
