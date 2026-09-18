@@ -11,9 +11,11 @@ Listing an item here does not create a task. Promotion requires an explicit plan
 These outcomes are on the path from the current foundation to Private Beta:
 
 - v0.2 master planning checkpoint;
-- Task 002 Self Model foundation;
-- remaining core Self Model entities and revision semantics;
-- local persistence and application services;
+- Task 002 Self Model foundation (complete);
+- Task 003 Belief/Value commitments and revision history;
+- Task 004 local persistence and application services for approved entities;
+- Task 005 Memory, Decision, and Outcome;
+- Task 006 Evidence foundation and explicit relationships;
 - basic Remember workflows;
 - explicit connections and reasoning traces;
 - adaptive response routing and interaction strategy;

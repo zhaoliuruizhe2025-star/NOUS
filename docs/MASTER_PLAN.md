@@ -60,7 +60,7 @@ Delivered the runnable Tauri 2 + React/TypeScript shell, bilingual localization 
 
 #### v0.2 planning checkpoint — Master plan
 
-Status: **IN PROGRESS (documentation only)**
+Status: **COMPLETE** at `8d9770d Establish NOUS v0.2 master plan`
 
 Purpose:
 
@@ -74,7 +74,7 @@ This checkpoint does not implement application code.
 
 #### Task 002 — Self Model foundation
 
-Status: **NEXT; NOT STARTED**
+Status: **COMPLETE** at `e324852 Complete NOUS Task 002 self model foundation`
 
 Scope is limited to:
 
@@ -89,18 +89,19 @@ Scope is limited to:
 
 It excludes persistence, migrations, UI work, inference, response routing, and all later entities.
 
-#### Task 003 — Self Model expansion (roadmap summary only)
+#### Task 003 — Commitments and revision history
 
-Candidate scope:
+Status: **PROPOSED; design ready for user review, implementation not authorized**
 
-- `Belief` and revisions;
-- `Value` and revisions;
-- `Memory`;
-- `Decision`;
-- `Outcome`;
-- `Evidence`.
+Scope:
 
-The exact boundaries may be split into multiple tasks after Task 002 review. This section is not an executable task specification.
+- `Belief`;
+- `BeliefRevision`;
+- `Value`;
+- `ValueRevision`;
+- required identifiers, bounded user-entered endorsement/importance values, positive revision-number validation, concrete user-authored revision origins, validation, serialization, and focused tests.
+
+It excludes Evidence, Memory, Decision, Outcome, persistence, migrations, reasoning, UI, and all inference. Cross-revision uniqueness and strict sequencing are Task 004 history/persistence/application responsibilities unless a separately approved aggregate abstraction is introduced. See `TASK_003_DESIGN.md`.
 
 #### Task 004 — Persistence foundation (roadmap summary only)
 
@@ -113,6 +114,28 @@ Candidate scope:
 - focused migration and persistence tests.
 
 No migration is authorized by this master plan alone.
+
+#### Task 005 — Lived-experience records (roadmap summary only)
+
+Candidate scope:
+
+- `Memory`;
+- `Decision`;
+- `Outcome`;
+- their direct, non-synthetic links to the current user and to each other.
+
+Decision and Outcome belong together: a Decision may have no Outcome yet, but an Outcome must reference a Decision. Memory remains distinct from Situation. This section is not an executable task specification.
+
+#### Task 006 — Evidence and explicit relationships (roadmap summary only)
+
+Candidate scope:
+
+- generic Evidence foundation;
+- explicit source/target relationship rules across approved self-model entities;
+- provenance and user-confirmation boundaries;
+- focused traceability tests.
+
+This task must not become a reasoning or inference engine merely by adding links.
 
 ### Phase B — Remember
 
@@ -259,6 +282,7 @@ implementation complete
 ## 7. Current handoff
 
 - Task 001: **COMPLETE** at `455e929`.
-- v0.2 master planning checkpoint: **documentation work in progress**.
-- Task 002: **NEXT; NOT STARTED**.
-- Task 003 and later: **roadmap summaries only; not authorized for implementation**.
+- v0.2 master planning checkpoint: **COMPLETE** at `8d9770d`.
+- Task 002: **COMPLETE** at `e324852`.
+- Task 003: **PROPOSED; design ready for user review, implementation not authorized**.
+- Task 004 and later: **roadmap summaries only; not authorized for implementation**.

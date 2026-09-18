@@ -20,9 +20,9 @@ Exit criteria:
 
 ## Current planning checkpoint
 
-Status: **documentation in progress**.
+Status: **complete** at `8d9770d Establish NOUS v0.2 master plan`.
 
-The v0.2 master planning checkpoint aligns product, architecture, interaction, roadmap, task governance, and backlog boundaries. It does not implement Task 002.
+The v0.2 master planning checkpoint aligned product, architecture, interaction, roadmap, task governance, and backlog boundaries.
 
 ## Phase 1 — v0.1 "Constructing a Self"
 
@@ -39,23 +39,23 @@ Goal: represent a changing person locally and transparently.
 Status: **COMPLETE** at `455e929`. This is historical completed work. Future changes require a new explicit task.
 
 ### 1B. Domain model
-Task 002 is the next task and is limited to:
+Task 002 is **COMPLETE** at `e324852 Complete NOUS Task 002 self model foundation`:
 - SelfSubject / PersonReference privacy boundary;
 - Observation
 - Situation
 - Thought
 - Emotion
 
-Task 002 also includes validation and focused tests. It does not include persistence, migrations, or UI.
+It includes validation, serialization, and focused tests. It does not include persistence, migrations, or UI.
 
-Later explicitly scoped tasks may add:
+The next proposed split is:
 
-- Belief + revisions
-- Value + revisions
-- Memory
-- Decision
-- Outcome
-- Evidence
+- Task 003: Belief, BeliefRevision, Value, and ValueRevision;
+- Task 004: persistence foundation for approved Task 002/003 types;
+- Task 005: Memory, Decision, and Outcome;
+- Task 006: generic Evidence foundation and explicit relationships.
+
+Task 003 is design-ready for user review but is not implementation-authorized. Evidence is deferred until the lived-experience source model is broader; a Thought never automatically becomes a Belief.
 
 ### 1C. Persistence
 - schema + migrations;

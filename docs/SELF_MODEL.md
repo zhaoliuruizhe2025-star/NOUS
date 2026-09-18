@@ -86,7 +86,7 @@ Examples:
 - "I have an offer to study abroad."
 - "I noticed I felt calmer after making the decision."
 
-An observation is evidence available to the model. It is not automatically a belief update.
+An Observation is not itself the future `Evidence` entity. It may later serve as a source record referenced by an Evidence link, but it does not automatically update a Belief or Value.
 
 Suggested conceptual fields:
 - id
@@ -159,39 +159,41 @@ A single situation may contain multiple emotions.
 
 ### 2.5 Belief
 
-A `Belief` is a relatively persistent proposition the user currently accepts to some degree.
+A `Belief` is a relatively persistent proposition the current user endorses or has historically endorsed to some degree. It is not an objective fact or a system conclusion.
 
 Examples:
 - "A meaningful life is constructed through choices."
 - "Important opportunities may not come again."
 - "People are morally responsible for their actions."
 
-Suggested fields:
-- id
-- proposition
-- confidence
-- importance
-- status
-- createdAt
+A Belief is an identity and ownership anchor (`id`, `selfSubjectId`). Its changing content belongs in `BeliefRevision` records. BeliefRevision inherits ownership through its parent `beliefId` and does not duplicate `selfSubjectId` unless a future design demonstrates a need. A current-state projection may select the latest revision later; the domain history must never overwrite an earlier revision.
 
-Belief change must use revisions/history rather than replacing the past.
+An optional user-entered `endorsement` may use a `0..=100` range. It means how strongly the user says they hold the proposition at that revision. It does not represent truth, evidence strength, prediction confidence, or system certainty. A user may leave it unquantified.
 
 ### 2.6 BeliefRevision
 
-Represents a Belief at a particular point in time.
+Represents a complete, append-only Belief state at one revision number.
 
 Suggested fields:
 - id
 - beliefId
-- confidence
-- wording
-- timestamp
-- evidenceLinks
-- reasonForRevision
+- positive revisionNumber
+- proposition
+- optional user-entered endorsement
+- optional user-entered change note
+- `RevisionOrigin`: `InitialUserEntry`, `UserUpdate`, or `UserCorrection`
+
+`InitialUserEntry` is the first user-authored canonical state. `UserUpdate` records that the user's actual Belief changed over time. `UserCorrection` records that the previous representation was inaccurate, mistyped, or otherwise incorrectly recorded; it is not psychological change.
+
+Task 003 can validate only that a `revisionNumber` is positive. Cross-revision uniqueness and strict sequencing belong to the history, persistence, or application layer in Task 004 unless a separately approved aggregate abstraction is introduced.
+
+Initial creation is a revision. A correction creates another user-authored revision rather than editing old history. System inference is not a `RevisionOrigin` variant: it must remain a separate future proposal/result with traceable sources, rule version, and uncertainty. It must not overwrite a user revision; only user confirmation may create a canonical revision.
+
+A revision may reword, refine, correct, change endorsement, or record evolution of the same underlying commitment. If the core semantic commitment has materially changed into a different proposition, create a new Belief rather than forcing it into the old revision history. NOUS must not infer continuity automatically; when it is ambiguous, the user determines it.
 
 ### 2.7 Value
 
-A `Value` describes what matters to the user, not what is true or false.
+A `Value` is an enduring orientation or priority that matters to the current user, not a proposition that is true or false.
 
 Examples:
 - autonomy;
@@ -202,32 +204,32 @@ Examples:
 - achievement;
 - compassion.
 
-Do not use "confidence" as the primary meaning of a Value.
+Do not use truth-confidence as the primary meaning of a Value.
 
-Suggested fields:
-- id
-- canonicalName
-- userLabel
-- importance
-- createdAt
+A Value is an identity and ownership anchor (`id`, `selfSubjectId`). Its label and priority state belong in `ValueRevision` records. ValueRevision inherits ownership through its parent `valueId` and does not duplicate `selfSubjectId` unless a future design demonstrates a need.
 
-Value importance may change over time and should therefore support revisions/history.
+An optional user-entered `importance` may use a `0..=100` range to express relative salience at a revision. It is not moral ranking, truth-confidence, or an automatic system score. A user may name a Value without quantifying it.
 
 ### 2.8 ValueRevision
 
 Suggested fields:
 - id
 - valueId
-- importance
-- timestamp
-- evidenceLinks
-- reasonForRevision
+- positive revisionNumber
+- user-facing label
+- optional user-entered importance
+- optional user-entered change note
+- `RevisionOrigin`: `InitialUserEntry`, `UserUpdate`, or `UserCorrection`
+
+The RevisionOrigin meanings and positive-only `revisionNumber` invariant are the same as for BeliefRevision; cross-revision uniqueness and strict sequencing are deferred to Task 004's history/persistence/application layer. Value revisions preserve historical wording and priority rather than updating an old state in place. A revision may reword, refine, correct, change importance, or record evolution of the same underlying Value. If the core value has materially changed, create a new Value; user confirmation determines continuity when ambiguous.
 
 ### 2.9 Memory
 
 A `Memory` is a user-described past experience that the user considers relevant to their current self.
 
 NOUS does not assume autobiographical memory is a perfectly objective record.
+
+A Memory is not merely a duplicate Situation: a Situation is context for a current thought, emotion, or decision, while a Memory is retrospectively meaningful and may be recorded long after the event. A future Memory may optionally refer to a past Situation, but no synthetic link is required.
 
 Suggested fields:
 - id
@@ -242,6 +244,8 @@ Suggested fields:
 ### 2.10 Decision
 
 A `Decision` is a choice made by the user in a defined context.
+
+A Decision may have no Outcome yet. It should not require a synthetic Situation, Memory, or Evidence record.
 
 Suggested fields:
 - id
@@ -258,6 +262,8 @@ Suggested fields:
 
 Represents what the user later reports happened after a Decision.
 
+An Outcome must reference the Decision it follows. Decision and Outcome should be implemented together as later lived-experience records.
+
 Suggested fields:
 - id
 - decisionId
@@ -268,20 +274,9 @@ Suggested fields:
 
 ### 2.12 Evidence
 
-`Evidence` links observations/experiences/decisions to possible model updates.
+`Evidence` is a future traceable source record or explicit link that may support, complicate, or contextualize a possible model change. It is not an Observation itself, an inference result, a hidden score, or permission to mutate a Belief or Value automatically. An Observation may later be a source record referenced by Evidence, but it does not automatically update a Belief or Value.
 
-Evidence should not mutate a Belief or Value by itself.
-
-Suggested fields:
-- id
-- sourceEntityType
-- sourceEntityId
-- targetEntityType
-- targetEntityId
-- direction
-- strength
-- timestamp
-- explanation
+Generic Evidence is deferred until the source model includes Memories, Decisions, and Outcomes and a separate relationship design defines source/target rules. A user-authored revision note is not Evidence and does not claim proof.
 
 ## 4. Relationships
 
@@ -299,6 +294,17 @@ The graph layer may support relationships such as:
 Not all relationship types should apply to all entity types.
 
 The schema should make illegal combinations difficult to create.
+
+The initial revision boundary is intentionally narrower:
+
+```text
+Belief         -> current SelfSubject
+Value          -> current SelfSubject
+BeliefRevision -> Belief (inherits ownership)
+ValueRevision  -> Value (inherits ownership)
+```
+
+Links between commitments and Observations, Thoughts, Memories, Decisions, Outcomes, or PersonReferences are deferred until the Evidence/relationship task. Do not manufacture placeholder links.
 
 ## 5. Important distinctions
 
@@ -375,9 +381,9 @@ Example:
 ```text
 Belief: "People have free will."
 
-2026-09   confidence 0.82
-2027-02   confidence 0.61
-2027-10   confidence 0.34
+2026-09   user-entered endorsement 82
+2027-02   user-entered endorsement 61
+2027-10   user-entered endorsement 34
 ```
 
 The current view can use the latest revision while Mirror can reconstruct earlier states.

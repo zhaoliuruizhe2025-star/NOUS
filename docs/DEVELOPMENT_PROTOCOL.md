@@ -95,4 +95,4 @@ Vision -> Architecture -> Epics -> Phases/Milestones -> Tasks -> Git checkpoints
 
 Task 001 is complete at `455e929` and remains historical. Any future change to its delivered behavior requires a new explicit task.
 
-Task 002 is next but not started. Tasks 003 and later may appear as roadmap summaries; they are not executable instructions until separately scoped and approved.
+Task 002 is complete at `e324852`. Task 003 has a design proposal but is not executable until the user approves a bounded task specification. Tasks 004 and later remain roadmap summaries only.

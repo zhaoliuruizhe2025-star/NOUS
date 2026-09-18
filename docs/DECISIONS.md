@@ -112,3 +112,13 @@ Relationship Lens is perspective expansion, not third-party mind-reading. Expres
 Life Paths is deferred from the first Private Beta as a scope reduction, not removed from the long-term NOUS product vision.
 
 Status: **Accepted**
+
+## D015 — Self Model expansion is staged by domain boundary
+
+Task 003 is limited to user-owned Beliefs, Values, and their append-only revision records. Belief and Value carry `SelfSubject` ownership; their revisions inherit it through the parent ID rather than duplicating a subject field. Belief endorsement is a user-entered degree of endorsement, not truth, evidence strength, prediction confidence, or system certainty. Value importance is user-entered relative salience, not truth-confidence or moral ranking.
+
+Revision origins are limited to `InitialUserEntry`, `UserUpdate`, and `UserCorrection`. A correction is not psychological change. Future system proposals are separate traceable artifacts, not revision origins, and require user confirmation before they become canonical. Task 003 validates positive revision numbers only; Task 004 enforces cross-history uniqueness and strict sequencing unless a separately approved aggregate is introduced. A materially new commitment creates a new Belief or Value; when continuity is ambiguous, the user decides. An Observation is not Evidence, though it may later be referenced as an Evidence source and never automatically updates a commitment.
+
+Evidence, Memory, Decision, and Outcome are deferred: Task 004 remains the persistence foundation; Task 005 groups Memory with Decision/Outcome as lived-experience records; Task 006 may introduce generic Evidence and explicit relationships after its source model is broad enough. A Thought never automatically becomes a Belief.
+
+Status: **Accepted**
