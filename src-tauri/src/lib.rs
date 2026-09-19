@@ -20,6 +20,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0002_create_self_model.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "create_lived_experience_records",
+            sql: include_str!("../migrations/0003_create_lived_experience_records.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -45,15 +51,20 @@ mod tests {
     use super::migrations;
 
     #[test]
-    fn contains_the_registered_infrastructure_and_self_model_migrations() {
+    fn contains_the_registered_task_migrations() {
         let migrations = migrations();
 
-        assert_eq!(migrations.len(), 2);
+        assert_eq!(migrations.len(), 3);
         assert_eq!(migrations[0].version, 1);
         assert_eq!(migrations[0].description, "initialize_local_storage");
         assert!(migrations[0].sql.contains("app_metadata"));
         assert_eq!(migrations[1].version, 2);
         assert_eq!(migrations[1].description, "create_self_model");
         assert!(migrations[1].sql.contains("CREATE TABLE \"values\""));
+        assert_eq!(migrations[2].version, 3);
+        assert_eq!(migrations[2].description, "create_lived_experience_records");
+        assert!(migrations[2].sql.contains("CREATE TABLE memories"));
+        assert!(migrations[2].sql.contains("CREATE TABLE decisions"));
+        assert!(migrations[2].sql.contains("CREATE TABLE outcomes"));
     }
 }

@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::persistence::SharedSqlitePool;
 
-const EXPECTED_SCHEMA_VERSION: &str = "2";
+const EXPECTED_SCHEMA_VERSION: &str = "3";
 const READINESS_ERROR: &str = "Local database readiness verification failed.";
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -44,7 +44,7 @@ fn status_for_schema_version(schema_version: Option<&str>) -> Result<DatabaseSta
         return Err(READINESS_ERROR);
     }
 
-    Ok(DatabaseStatus { schema_version: 2 })
+    Ok(DatabaseStatus { schema_version: 3 })
 }
 
 #[cfg(test)]
@@ -58,9 +58,10 @@ mod tests {
     #[test]
     fn reports_ready_only_for_the_expected_schema_version() {
         assert_eq!(
-            status_for_schema_version(Some("2")),
-            Ok(DatabaseStatus { schema_version: 2 })
+            status_for_schema_version(Some("3")),
+            Ok(DatabaseStatus { schema_version: 3 })
         );
+        assert_eq!(status_for_schema_version(Some("2")), Err(READINESS_ERROR));
         assert_eq!(status_for_schema_version(Some("1")), Err(READINESS_ERROR));
         assert_eq!(status_for_schema_version(None), Err(READINESS_ERROR));
     }
@@ -68,9 +69,9 @@ mod tests {
     #[test]
     fn serializes_the_small_frontend_status_shape() {
         assert_eq!(
-            serde_json::to_value(DatabaseStatus { schema_version: 2 })
+            serde_json::to_value(DatabaseStatus { schema_version: 3 })
                 .expect("database status should serialize"),
-            serde_json::json!({ "schemaVersion": 2 })
+            serde_json::json!({ "schemaVersion": 3 })
         );
     }
 
@@ -115,7 +116,16 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 database_status_for_pool(&database).await,
-                Ok(DatabaseStatus { schema_version: 2 })
+                Err(READINESS_ERROR)
+            );
+
+            sqlx::query("UPDATE app_metadata SET value = '3' WHERE key = 'schema_version'")
+                .execute(&pool)
+                .await
+                .unwrap();
+            assert_eq!(
+                database_status_for_pool(&database).await,
+                Ok(DatabaseStatus { schema_version: 3 })
             );
 
             let mut connection = pool.acquire().await.unwrap();

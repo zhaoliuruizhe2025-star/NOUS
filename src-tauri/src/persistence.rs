@@ -245,6 +245,7 @@ fn revision_number(entity: &'static str, value: i64) -> Result<u32, PersistenceE
 }
 
 type ThoughtDatabaseRow = (String, String, Option<String>, String, Option<i64>, i64);
+type MemoryDatabaseRow = (String, String, Option<String>, String, Option<String>, i64);
 type BeliefRevisionDatabaseRow = (
     String,
     String,
@@ -661,6 +662,182 @@ impl SqliteSelfModelRepository {
             created_at_ms,
         }
         .try_into()
+    }
+
+    pub(crate) async fn create_memory(
+        &self,
+        memory: &crate::domain::Memory,
+        created_at_ms: i64,
+    ) -> Result<(), PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        sqlx::query("INSERT INTO memories (id, subject_id, situation_id, description, user_meaning, created_at_ms) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(memory.id().as_str())
+            .bind(memory.subject_id().as_str())
+            .bind(memory.situation_id().map(crate::domain::SituationId::as_str))
+            .bind(memory.description())
+            .bind(memory.user_meaning())
+            .bind(created_at_ms)
+            .execute(&mut **connection.connection())
+            .await
+            .map_err(|error| write_error("create_memory", error))?;
+        Ok(())
+    }
+
+    pub(crate) async fn load_memory(
+        &self,
+        id: &crate::domain::MemoryId,
+    ) -> Result<crate::domain::Memory, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let row: Option<MemoryDatabaseRow> =
+            sqlx::query_as("SELECT id, subject_id, situation_id, description, user_meaning, created_at_ms FROM memories WHERE id = ?")
+                .bind(id.as_str())
+                .fetch_optional(&mut **connection.connection())
+                .await
+                .map_err(PersistenceError::from)?;
+        let (id, subject_id, situation_id, description, user_meaning, created_at_ms) = row
+            .ok_or_else(|| PersistenceError::NotFound {
+                entity: "Memory",
+                id: id.as_str().to_owned(),
+            })?;
+        MemoryRow {
+            id,
+            subject_id,
+            situation_id,
+            description,
+            user_meaning,
+            created_at_ms,
+        }
+        .try_into()
+    }
+
+    pub(crate) async fn create_decision(
+        &self,
+        decision: &crate::domain::Decision,
+        created_at_ms: i64,
+    ) -> Result<(), PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        sqlx::query("INSERT INTO decisions (id, subject_id, situation_id, description, created_at_ms) VALUES (?, ?, ?, ?, ?)")
+            .bind(decision.id().as_str())
+            .bind(decision.subject_id().as_str())
+            .bind(decision.situation_id().map(crate::domain::SituationId::as_str))
+            .bind(decision.description())
+            .bind(created_at_ms)
+            .execute(&mut **connection.connection())
+            .await
+            .map_err(|error| write_error("create_decision", error))?;
+        Ok(())
+    }
+
+    pub(crate) async fn load_decision(
+        &self,
+        id: &crate::domain::DecisionId,
+    ) -> Result<crate::domain::Decision, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let row: Option<(String, String, Option<String>, String, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, situation_id, description, created_at_ms FROM decisions WHERE id = ?",
+        )
+        .bind(id.as_str())
+        .fetch_optional(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+        let (id, subject_id, situation_id, description, created_at_ms) =
+            row.ok_or_else(|| PersistenceError::NotFound {
+                entity: "Decision",
+                id: id.as_str().to_owned(),
+            })?;
+        DecisionRow {
+            id,
+            subject_id,
+            situation_id,
+            description,
+            created_at_ms,
+        }
+        .try_into()
+    }
+
+    pub(crate) async fn create_outcome(
+        &self,
+        outcome: &crate::domain::Outcome,
+        created_at_ms: i64,
+    ) -> Result<(), PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        sqlx::query("INSERT INTO outcomes (id, subject_id, decision_id, description, created_at_ms) VALUES (?, ?, ?, ?, ?)")
+            .bind(outcome.id().as_str())
+            .bind(outcome.subject_id().as_str())
+            .bind(outcome.decision_id().as_str())
+            .bind(outcome.description())
+            .bind(created_at_ms)
+            .execute(&mut **connection.connection())
+            .await
+            .map_err(|error| write_error("create_outcome", error))?;
+        Ok(())
+    }
+
+    pub(crate) async fn load_outcome(
+        &self,
+        id: &crate::domain::OutcomeId,
+    ) -> Result<crate::domain::Outcome, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let row: Option<(String, String, String, String, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, decision_id, description, created_at_ms FROM outcomes WHERE id = ?",
+        )
+        .bind(id.as_str())
+        .fetch_optional(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+        let (id, subject_id, decision_id, description, created_at_ms) =
+            row.ok_or_else(|| PersistenceError::NotFound {
+                entity: "Outcome",
+                id: id.as_str().to_owned(),
+            })?;
+        OutcomeRow {
+            id,
+            subject_id,
+            decision_id,
+            description,
+            created_at_ms,
+        }
+        .try_into()
+    }
+
+    pub(crate) async fn load_outcomes_for_decision(
+        &self,
+        decision_id: &crate::domain::DecisionId,
+    ) -> Result<Vec<crate::domain::Outcome>, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let exists: Option<i64> = sqlx::query_scalar("SELECT 1 FROM decisions WHERE id = ?")
+            .bind(decision_id.as_str())
+            .fetch_optional(&mut **connection.connection())
+            .await
+            .map_err(PersistenceError::from)?;
+        if exists.is_none() {
+            return Err(PersistenceError::NotFound {
+                entity: "Decision",
+                id: decision_id.as_str().to_owned(),
+            });
+        }
+
+        let rows: Vec<(String, String, String, String, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, decision_id, description, created_at_ms FROM outcomes WHERE decision_id = ? ORDER BY created_at_ms ASC, id ASC",
+        )
+        .bind(decision_id.as_str())
+        .fetch_all(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+        rows.into_iter()
+            .map(
+                |(id, subject_id, decision_id, description, created_at_ms)| {
+                    OutcomeRow {
+                        id,
+                        subject_id,
+                        decision_id,
+                        description,
+                        created_at_ms,
+                    }
+                    .try_into()
+                },
+            )
+            .collect()
     }
 
     pub(crate) async fn create_belief_with_initial_revision(
@@ -1369,6 +1546,122 @@ impl TryFrom<EmotionRow> for crate::domain::Emotion {
 }
 
 #[derive(Clone, Debug)]
+struct MemoryRow {
+    id: String,
+    subject_id: String,
+    situation_id: Option<String>,
+    description: String,
+    user_meaning: Option<String>,
+    created_at_ms: i64,
+}
+
+impl TryFrom<MemoryRow> for crate::domain::Memory {
+    type Error = PersistenceError;
+
+    fn try_from(row: MemoryRow) -> Result<Self, Self::Error> {
+        let _ = row.created_at_ms;
+        let id = reconstruct("Memory", "id", crate::domain::MemoryId::new(row.id))?;
+        let subject_id = reconstruct(
+            "Memory",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(row.subject_id),
+        )?;
+        let situation_id = row
+            .situation_id
+            .map(|id| {
+                reconstruct(
+                    "Memory",
+                    "situation_id",
+                    crate::domain::SituationId::new(id),
+                )
+            })
+            .transpose()?;
+        reconstruct(
+            "Memory",
+            "description_or_user_meaning",
+            Self::new(
+                id,
+                subject_id,
+                situation_id,
+                row.description,
+                row.user_meaning,
+            ),
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+struct DecisionRow {
+    id: String,
+    subject_id: String,
+    situation_id: Option<String>,
+    description: String,
+    created_at_ms: i64,
+}
+
+impl TryFrom<DecisionRow> for crate::domain::Decision {
+    type Error = PersistenceError;
+
+    fn try_from(row: DecisionRow) -> Result<Self, Self::Error> {
+        let _ = row.created_at_ms;
+        let id = reconstruct("Decision", "id", crate::domain::DecisionId::new(row.id))?;
+        let subject_id = reconstruct(
+            "Decision",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(row.subject_id),
+        )?;
+        let situation_id = row
+            .situation_id
+            .map(|id| {
+                reconstruct(
+                    "Decision",
+                    "situation_id",
+                    crate::domain::SituationId::new(id),
+                )
+            })
+            .transpose()?;
+        reconstruct(
+            "Decision",
+            "description",
+            Self::new(id, subject_id, situation_id, row.description),
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+struct OutcomeRow {
+    id: String,
+    subject_id: String,
+    decision_id: String,
+    description: String,
+    created_at_ms: i64,
+}
+
+impl TryFrom<OutcomeRow> for crate::domain::Outcome {
+    type Error = PersistenceError;
+
+    fn try_from(row: OutcomeRow) -> Result<Self, Self::Error> {
+        let _ = row.created_at_ms;
+        let id = reconstruct("Outcome", "id", crate::domain::OutcomeId::new(row.id))?;
+        let subject_id = reconstruct(
+            "Outcome",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(row.subject_id),
+        )?;
+        let decision_id = reconstruct(
+            "Outcome",
+            "decision_id",
+            crate::domain::DecisionId::new(row.decision_id),
+        )?;
+        reconstruct(
+            "Outcome",
+            "description",
+            Self::new(id, subject_id, decision_id, row.description),
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct BeliefRevisionRow {
     pub(crate) id: String,
     pub(crate) belief_id: String,
@@ -1602,6 +1895,8 @@ mod tests {
 
     const MIGRATION_0001: &str = include_str!("../migrations/0001_initialize.sql");
     const MIGRATION_0002: &str = include_str!("../migrations/0002_create_self_model.sql");
+    const MIGRATION_0003: &str =
+        include_str!("../migrations/0003_create_lived_experience_records.sql");
 
     type ColumnExpectation = (&'static str, &'static str, i64, i64);
     type TableColumnExpectations = (&'static str, &'static [ColumnExpectation]);
@@ -1675,6 +1970,7 @@ mod tests {
         let database = TempDatabase::open().await;
         database.apply(MIGRATION_0001).await;
         database.apply(MIGRATION_0002).await;
+        database.apply(MIGRATION_0003).await;
         database
     }
 
@@ -1696,6 +1992,17 @@ mod tests {
             "values",
             "value_revisions",
         ] {
+            assert!(tables.iter().any(|found| found == table), "missing {table}");
+        }
+    }
+
+    async fn assert_task005_tables_exist(pool: &SqlitePool) {
+        let tables: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+                .fetch_all(pool)
+                .await
+                .unwrap();
+        for table in ["memories", "decisions", "outcomes"] {
             assert!(tables.iter().any(|found| found == table), "missing {table}");
         }
     }
@@ -1757,6 +2064,34 @@ mod tests {
         .unwrap();
         repository.create_self_subject(&subject, 1).await.unwrap();
         subject
+    }
+
+    async fn create_subject_fixture(
+        repository: &SqliteSelfModelRepository,
+        id: &str,
+    ) -> crate::domain::SelfSubject {
+        let subject = crate::domain::SelfSubject::new(
+            crate::domain::SelfSubjectId::new(id).unwrap(),
+            format!("Subject {id}"),
+        )
+        .unwrap();
+        repository.create_self_subject(&subject, 1).await.unwrap();
+        subject
+    }
+
+    async fn create_situation_fixture(
+        repository: &SqliteSelfModelRepository,
+        subject: &crate::domain::SelfSubject,
+        id: &str,
+    ) -> crate::domain::Situation {
+        let situation = crate::domain::Situation::new(
+            crate::domain::SituationId::new(id).unwrap(),
+            subject.id().clone(),
+            format!("Situation {id}"),
+        )
+        .unwrap();
+        repository.create_situation(&situation, 2).await.unwrap();
+        situation
     }
 
     fn belief(id: &str, subject_id: &crate::domain::SelfSubjectId) -> crate::domain::Belief {
@@ -1821,16 +2156,42 @@ mod tests {
     }
 
     #[test]
-    fn checked_in_migrations_create_all_tables_and_update_schema_version() {
+    fn checked_in_migrations_create_all_domain_tables_and_update_schema_version() {
         tauri::async_runtime::block_on(async {
             let database = migrated_database().await;
             assert_task004_tables_exist(&database.pool).await;
+            assert_task005_tables_exist(&database.pool).await;
+            let tables: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+            )
+            .fetch_all(&database.pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                tables,
+                [
+                    "app_metadata",
+                    "belief_revisions",
+                    "beliefs",
+                    "decisions",
+                    "emotions",
+                    "memories",
+                    "observations",
+                    "outcomes",
+                    "person_references",
+                    "self_subjects",
+                    "situations",
+                    "thoughts",
+                    "value_revisions",
+                    "values",
+                ]
+            );
             let version: String =
                 sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
                     .fetch_one(&database.pool)
                     .await
                     .unwrap();
-            assert_eq!(version, "2");
+            assert_eq!(version, "3");
             database.close().await;
         });
     }
@@ -1942,6 +2303,37 @@ mod tests {
                         ("created_at_ms", "INTEGER", 1, 0),
                     ],
                 ),
+                (
+                    "memories",
+                    &[
+                        ("id", "TEXT", 1, 1),
+                        ("subject_id", "TEXT", 1, 0),
+                        ("situation_id", "TEXT", 0, 0),
+                        ("description", "TEXT", 1, 0),
+                        ("user_meaning", "TEXT", 0, 0),
+                        ("created_at_ms", "INTEGER", 1, 0),
+                    ],
+                ),
+                (
+                    "decisions",
+                    &[
+                        ("id", "TEXT", 1, 1),
+                        ("subject_id", "TEXT", 1, 0),
+                        ("situation_id", "TEXT", 0, 0),
+                        ("description", "TEXT", 1, 0),
+                        ("created_at_ms", "INTEGER", 1, 0),
+                    ],
+                ),
+                (
+                    "outcomes",
+                    &[
+                        ("id", "TEXT", 1, 1),
+                        ("subject_id", "TEXT", 1, 0),
+                        ("decision_id", "TEXT", 1, 0),
+                        ("description", "TEXT", 1, 0),
+                        ("created_at_ms", "INTEGER", 1, 0),
+                    ],
+                ),
             ];
             for (table, expected) in expected_columns {
                 let actual = table_columns(&database.pool, table).await;
@@ -2008,6 +2400,30 @@ mod tests {
                     "value_revisions",
                     &[("values", "value_id", "id", "RESTRICT")],
                 ),
+                (
+                    "memories",
+                    &[
+                        ("self_subjects", "subject_id", "id", "RESTRICT"),
+                        ("situations", "situation_id", "id", "RESTRICT"),
+                        ("situations", "subject_id", "subject_id", "RESTRICT"),
+                    ],
+                ),
+                (
+                    "decisions",
+                    &[
+                        ("self_subjects", "subject_id", "id", "RESTRICT"),
+                        ("situations", "situation_id", "id", "RESTRICT"),
+                        ("situations", "subject_id", "subject_id", "RESTRICT"),
+                    ],
+                ),
+                (
+                    "outcomes",
+                    &[
+                        ("self_subjects", "subject_id", "id", "RESTRICT"),
+                        ("decisions", "decision_id", "id", "RESTRICT"),
+                        ("decisions", "subject_id", "subject_id", "RESTRICT"),
+                    ],
+                ),
             ];
             for (table, expected) in expected_foreign_keys {
                 let actual = foreign_keys(&database.pool, table).await;
@@ -2037,10 +2453,16 @@ mod tests {
                 [
                     "belief_revisions_belief_id_idx",
                     "beliefs_subject_id_idx",
+                    "decisions_situation_subject_idx",
+                    "decisions_subject_id_idx",
                     "emotions_situation_subject_idx",
                     "emotions_subject_id_idx",
+                    "memories_situation_subject_idx",
+                    "memories_subject_id_idx",
                     "observations_situation_subject_idx",
                     "observations_subject_id_idx",
+                    "outcomes_decision_subject_idx",
+                    "outcomes_subject_id_idx",
                     "person_references_subject_id_idx",
                     "situations_subject_id_idx",
                     "thoughts_situation_subject_idx",
@@ -2059,6 +2481,9 @@ mod tests {
             assert!(unique_index_columns(&database.pool, "value_revisions")
                 .await
                 .contains(&vec!["value_id".into(), "revision_number".into()]));
+            assert!(unique_index_columns(&database.pool, "decisions")
+                .await
+                .contains(&vec!["id".into(), "subject_id".into()]));
 
             database.close().await;
         });
@@ -2088,6 +2513,33 @@ mod tests {
     }
 
     #[test]
+    fn version_two_database_upgrades_through_the_real_third_migration() {
+        tauri::async_runtime::block_on(async {
+            let database = TempDatabase::open().await;
+            database.apply(MIGRATION_0001).await;
+            database.apply(MIGRATION_0002).await;
+            let version: String =
+                sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(version, "2");
+
+            database.apply(MIGRATION_0003).await;
+            assert_task004_tables_exist(&database.pool).await;
+            assert_task005_tables_exist(&database.pool).await;
+            let version: String =
+                sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(version, "3");
+
+            database.close().await;
+        });
+    }
+
+    #[test]
     fn real_second_migration_failure_is_surfaced_and_does_not_report_version_two() {
         tauri::async_runtime::block_on(async {
             let database = TempDatabase::open().await;
@@ -2105,6 +2557,254 @@ mod tests {
                     .await
                     .unwrap();
             assert_eq!(version, "1");
+
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn real_third_migration_failure_is_surfaced_and_does_not_report_version_three() {
+        tauri::async_runtime::block_on(async {
+            let database = TempDatabase::open().await;
+            database.apply(MIGRATION_0001).await;
+            database.apply(MIGRATION_0002).await;
+            sqlx::query("CREATE TABLE memories (id TEXT PRIMARY KEY)")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+
+            let failure = sqlx::raw_sql(MIGRATION_0003).execute(&database.pool).await;
+            assert!(failure.is_err());
+            let version: String =
+                sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(version, "2");
+
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn third_migration_enforces_lived_experience_ownership_text_and_cardinality() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            sqlx::query(
+                "INSERT INTO self_subjects (id, display_name, created_at_ms) VALUES \
+                 ('subject-a', 'Subject A', 1), ('subject-b', 'Subject B', 2)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO situations (id, subject_id, description, created_at_ms) VALUES \
+                 ('situation-a', 'subject-a', 'Context A', 3), \
+                 ('situation-b', 'subject-b', 'Context B', 4)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+
+            sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-a', 'subject-a', 'situation-a', 'Remembered event', NULL, 5)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-no-context', 'subject-a', NULL, 'No linked context', \
+                 'User-authored meaning', 6)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-cross', 'subject-a', 'situation-b', 'Cross subject', NULL, 7)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-missing', 'missing', NULL, 'Missing subject', NULL, 8)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-blank', 'subject-a', NULL, ' ', NULL, 9)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-empty', 'subject-a', NULL, '', NULL, 9)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-meaning', 'subject-a', NULL, 'Valid description', ' ', 10)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES ('memory-empty-meaning', 'subject-a', NULL, 'Valid description', '', 10)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO memories \
+                 (id, subject_id, situation_id, description, user_meaning, created_at_ms) \
+                 VALUES (' ', 'subject-a', NULL, 'Blank id', NULL, 11)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+
+            sqlx::query(
+                "INSERT INTO decisions \
+                 (id, subject_id, situation_id, description, created_at_ms) \
+                 VALUES ('decision-a', 'subject-a', 'situation-a', 'A decision', 12)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO decisions \
+                 (id, subject_id, situation_id, description, created_at_ms) \
+                 VALUES ('decision-no-context', 'subject-a', NULL, 'No linked context', 13)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            assert!(sqlx::query(
+                "INSERT INTO decisions \
+                 (id, subject_id, situation_id, description, created_at_ms) \
+                 VALUES ('decision-cross', 'subject-a', 'situation-b', 'Cross subject', 14)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO decisions \
+                 (id, subject_id, situation_id, description, created_at_ms) \
+                 VALUES ('decision-blank', 'subject-a', NULL, '', 15)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO decisions \
+                 (id, subject_id, situation_id, description, created_at_ms) \
+                 VALUES ('decision-whitespace', 'subject-a', NULL, ' ', 15)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO decisions \
+                 (id, subject_id, situation_id, description, created_at_ms) \
+                 VALUES (' ', 'subject-a', NULL, 'Blank id', 16)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+
+            for (id, created_at_ms) in [("outcome-a", 17_i64), ("outcome-b", 18_i64)] {
+                sqlx::query(
+                    "INSERT INTO outcomes \
+                     (id, subject_id, decision_id, description, created_at_ms) \
+                     VALUES (?, 'subject-a', 'decision-a', 'Reported outcome', ?)",
+                )
+                .bind(id)
+                .bind(created_at_ms)
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            }
+            assert!(sqlx::query(
+                "INSERT INTO outcomes \
+                 (id, subject_id, decision_id, description, created_at_ms) \
+                 VALUES ('outcome-missing', 'subject-a', 'missing', 'Missing decision', 19)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO outcomes \
+                 (id, subject_id, decision_id, description, created_at_ms) \
+                 VALUES ('outcome-cross', 'subject-b', 'decision-a', 'Cross subject', 20)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO outcomes \
+                 (id, subject_id, decision_id, description, created_at_ms) \
+                 VALUES ('outcome-blank', 'subject-a', 'decision-a', ' ', 21)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO outcomes \
+                 (id, subject_id, decision_id, description, created_at_ms) \
+                 VALUES ('outcome-empty', 'subject-a', 'decision-a', '', 21)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+            assert!(sqlx::query(
+                "INSERT INTO outcomes \
+                 (id, subject_id, decision_id, description, created_at_ms) \
+                 VALUES (' ', 'subject-a', 'decision-a', 'Blank id', 22)",
+            )
+            .execute(&database.pool)
+            .await
+            .is_err());
+
+            let outcome_count: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM outcomes WHERE decision_id = 'decision-a'",
+            )
+            .fetch_one(&database.pool)
+            .await
+            .unwrap();
+            assert_eq!(outcome_count, 2);
+            assert!(sqlx::query("DELETE FROM decisions WHERE id = 'decision-a'")
+                .execute(&database.pool)
+                .await
+                .is_err());
+            assert!(
+                sqlx::query("DELETE FROM situations WHERE id = 'situation-a'")
+                    .execute(&database.pool)
+                    .await
+                    .is_err()
+            );
+            assert!(
+                sqlx::query("DELETE FROM self_subjects WHERE id = 'subject-a'")
+                    .execute(&database.pool)
+                    .await
+                    .is_err()
+            );
 
             database.close().await;
         });
@@ -2213,6 +2913,40 @@ mod tests {
             assert_eq!(enabled, 1);
             drop(first);
             drop(verified);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn lived_experience_create_rejects_an_operation_connection_with_foreign_keys_disabled() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let mut first = database.pool.acquire().await.unwrap();
+            let mut second = database.pool.acquire().await.unwrap();
+            for connection in [&mut first, &mut second] {
+                sqlx::query("PRAGMA foreign_keys = OFF")
+                    .execute(&mut **connection)
+                    .await
+                    .unwrap();
+            }
+            drop(first);
+            drop(second);
+
+            let repository = repository(&database);
+            let memory = crate::domain::Memory::new(
+                crate::domain::MemoryId::new("fk-disabled-memory").unwrap(),
+                crate::domain::SelfSubjectId::new("fk-disabled-subject").unwrap(),
+                None,
+                "The operation must fail before attempting this insert.",
+                None,
+            )
+            .unwrap();
+            assert!(matches!(
+                repository.create_memory(&memory, 1).await,
+                Err(PersistenceError::NotReady(_))
+            ));
+
+            drop(repository);
             database.close().await;
         });
     }
@@ -2399,6 +3133,668 @@ mod tests {
     }
 
     #[test]
+    fn lived_experience_records_round_trip_unicode_and_optional_fields() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject = create_subject_fixture(&repository, "lived-subject").await;
+            let situation =
+                create_situation_fixture(&repository, &subject, "lived-situation").await;
+
+            let memories = [
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-none").unwrap(),
+                    subject.id().clone(),
+                    None,
+                    "I remembered the first day at school.",
+                    None,
+                )
+                .unwrap(),
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-situation").unwrap(),
+                    subject.id().clone(),
+                    Some(situation.id().clone()),
+                    "那天我第一次独自回家。",
+                    None,
+                )
+                .unwrap(),
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-meaning").unwrap(),
+                    subject.id().clone(),
+                    None,
+                    "A difficult conversation 对话",
+                    Some("I learned 我可以 ask for help.".into()),
+                )
+                .unwrap(),
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-both").unwrap(),
+                    subject.id().clone(),
+                    Some(situation.id().clone()),
+                    "毕业那天 felt uncertain 🌱",
+                    Some("Endings can also be beginnings.".into()),
+                )
+                .unwrap(),
+            ];
+            for (offset, memory) in memories.iter().enumerate() {
+                repository
+                    .create_memory(memory, 10 + i64::try_from(offset).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(repository.load_memory(memory.id()).await.unwrap(), *memory);
+            }
+            let stored_created_at_ms: i64 =
+                sqlx::query_scalar("SELECT created_at_ms FROM memories WHERE id = 'memory-both'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(stored_created_at_ms, 13);
+
+            let decisions = [
+                crate::domain::Decision::new(
+                    crate::domain::DecisionId::new("decision-none").unwrap(),
+                    subject.id().clone(),
+                    None,
+                    "I chose to wait before replying.",
+                )
+                .unwrap(),
+                crate::domain::Decision::new(
+                    crate::domain::DecisionId::new("decision-situation").unwrap(),
+                    subject.id().clone(),
+                    Some(situation.id().clone()),
+                    "我决定接受 the new role 🚀",
+                )
+                .unwrap(),
+            ];
+            for (offset, decision) in decisions.iter().enumerate() {
+                repository
+                    .create_decision(decision, 20 + i64::try_from(offset).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    repository.load_decision(decision.id()).await.unwrap(),
+                    *decision
+                );
+            }
+
+            let outcome = crate::domain::Outcome::new(
+                crate::domain::OutcomeId::new("outcome-unicode").unwrap(),
+                subject.id().clone(),
+                decisions[0].id().clone(),
+                "后来我收到 a thoughtful reply 🌏",
+            )
+            .unwrap();
+            repository.create_outcome(&outcome, 30).await.unwrap();
+            assert_eq!(
+                repository.load_outcome(outcome.id()).await.unwrap(),
+                outcome
+            );
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn lived_experience_creates_translate_identity_and_scoped_ownership_constraints() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject_a = create_subject_fixture(&repository, "lived-a").await;
+            let subject_b = create_subject_fixture(&repository, "lived-b").await;
+            let situation_a =
+                create_situation_fixture(&repository, &subject_a, "lived-situation-a").await;
+
+            let memory = crate::domain::Memory::new(
+                crate::domain::MemoryId::new("constraint-memory").unwrap(),
+                subject_a.id().clone(),
+                Some(situation_a.id().clone()),
+                "A valid memory",
+                None,
+            )
+            .unwrap();
+            repository.create_memory(&memory, 10).await.unwrap();
+            assert!(matches!(
+                repository.create_memory(&memory, 11).await,
+                Err(PersistenceError::ConstraintViolation {
+                    operation: "create_memory",
+                    ..
+                })
+            ));
+            for invalid in [
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-missing-subject").unwrap(),
+                    crate::domain::SelfSubjectId::new("missing-subject").unwrap(),
+                    None,
+                    "Missing subject",
+                    None,
+                )
+                .unwrap(),
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-missing-situation").unwrap(),
+                    subject_a.id().clone(),
+                    Some(crate::domain::SituationId::new("missing-situation").unwrap()),
+                    "Missing situation",
+                    None,
+                )
+                .unwrap(),
+                crate::domain::Memory::new(
+                    crate::domain::MemoryId::new("memory-cross-situation").unwrap(),
+                    subject_b.id().clone(),
+                    Some(situation_a.id().clone()),
+                    "Cross-subject situation",
+                    None,
+                )
+                .unwrap(),
+            ] {
+                assert!(matches!(
+                    repository.create_memory(&invalid, 12).await,
+                    Err(PersistenceError::ConstraintViolation {
+                        operation: "create_memory",
+                        ..
+                    })
+                ));
+            }
+
+            let decision = crate::domain::Decision::new(
+                crate::domain::DecisionId::new("constraint-decision").unwrap(),
+                subject_a.id().clone(),
+                Some(situation_a.id().clone()),
+                "A valid decision",
+            )
+            .unwrap();
+            repository.create_decision(&decision, 20).await.unwrap();
+            assert!(matches!(
+                repository.create_decision(&decision, 21).await,
+                Err(PersistenceError::ConstraintViolation {
+                    operation: "create_decision",
+                    ..
+                })
+            ));
+            for invalid in [
+                crate::domain::Decision::new(
+                    crate::domain::DecisionId::new("decision-missing-subject").unwrap(),
+                    crate::domain::SelfSubjectId::new("missing-subject").unwrap(),
+                    None,
+                    "Missing subject",
+                )
+                .unwrap(),
+                crate::domain::Decision::new(
+                    crate::domain::DecisionId::new("decision-missing-situation").unwrap(),
+                    subject_a.id().clone(),
+                    Some(crate::domain::SituationId::new("missing-situation").unwrap()),
+                    "Missing situation",
+                )
+                .unwrap(),
+                crate::domain::Decision::new(
+                    crate::domain::DecisionId::new("decision-cross-situation").unwrap(),
+                    subject_b.id().clone(),
+                    Some(situation_a.id().clone()),
+                    "Cross-subject situation",
+                )
+                .unwrap(),
+            ] {
+                assert!(matches!(
+                    repository.create_decision(&invalid, 22).await,
+                    Err(PersistenceError::ConstraintViolation {
+                        operation: "create_decision",
+                        ..
+                    })
+                ));
+            }
+
+            let outcome = crate::domain::Outcome::new(
+                crate::domain::OutcomeId::new("constraint-outcome").unwrap(),
+                subject_a.id().clone(),
+                decision.id().clone(),
+                "A valid outcome",
+            )
+            .unwrap();
+            repository.create_outcome(&outcome, 30).await.unwrap();
+            assert!(matches!(
+                repository.create_outcome(&outcome, 31).await,
+                Err(PersistenceError::ConstraintViolation {
+                    operation: "create_outcome",
+                    ..
+                })
+            ));
+            for invalid in [
+                crate::domain::Outcome::new(
+                    crate::domain::OutcomeId::new("outcome-missing-subject").unwrap(),
+                    crate::domain::SelfSubjectId::new("missing-subject").unwrap(),
+                    decision.id().clone(),
+                    "Missing subject",
+                )
+                .unwrap(),
+                crate::domain::Outcome::new(
+                    crate::domain::OutcomeId::new("outcome-missing-decision").unwrap(),
+                    subject_a.id().clone(),
+                    crate::domain::DecisionId::new("missing-decision").unwrap(),
+                    "Missing decision",
+                )
+                .unwrap(),
+                crate::domain::Outcome::new(
+                    crate::domain::OutcomeId::new("outcome-cross-decision").unwrap(),
+                    subject_b.id().clone(),
+                    decision.id().clone(),
+                    "Cross-subject decision",
+                )
+                .unwrap(),
+            ] {
+                assert!(matches!(
+                    repository.create_outcome(&invalid, 32).await,
+                    Err(PersistenceError::ConstraintViolation {
+                        operation: "create_outcome",
+                        ..
+                    })
+                ));
+            }
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn outcome_collection_distinguishes_missing_empty_and_orders_storage_deterministically() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject = create_subject_fixture(&repository, "outcome-list-subject").await;
+            let decision = crate::domain::Decision::new(
+                crate::domain::DecisionId::new("outcome-list-decision").unwrap(),
+                subject.id().clone(),
+                None,
+                "A decision that may have outcomes",
+            )
+            .unwrap();
+            repository.create_decision(&decision, 5).await.unwrap();
+
+            assert!(repository
+                .load_outcomes_for_decision(decision.id())
+                .await
+                .unwrap()
+                .is_empty());
+            assert!(matches!(
+                repository
+                    .load_outcomes_for_decision(
+                        &crate::domain::DecisionId::new("missing-decision").unwrap()
+                    )
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "Decision",
+                    ..
+                })
+            ));
+
+            let outcomes = [
+                ("outcome-b", 10_i64),
+                ("outcome-c", 20_i64),
+                ("outcome-a", 10_i64),
+            ]
+            .map(|(id, created_at_ms)| {
+                (
+                    crate::domain::Outcome::new(
+                        crate::domain::OutcomeId::new(id).unwrap(),
+                        subject.id().clone(),
+                        decision.id().clone(),
+                        format!("Reported result {id}"),
+                    )
+                    .unwrap(),
+                    created_at_ms,
+                )
+            });
+
+            repository
+                .create_outcome(&outcomes[0].0, outcomes[0].1)
+                .await
+                .unwrap();
+            assert_eq!(
+                repository
+                    .load_outcomes_for_decision(decision.id())
+                    .await
+                    .unwrap(),
+                vec![outcomes[0].0.clone()]
+            );
+            for (outcome, created_at_ms) in outcomes.iter().skip(1) {
+                repository
+                    .create_outcome(outcome, *created_at_ms)
+                    .await
+                    .unwrap();
+            }
+
+            let loaded = repository
+                .load_outcomes_for_decision(decision.id())
+                .await
+                .unwrap();
+            let loaded_ids = loaded
+                .iter()
+                .map(|outcome| outcome.id().as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(loaded_ids, ["outcome-a", "outcome-b", "outcome-c"]);
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn lived_experience_repository_loads_reject_corrupt_rows_without_repair() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject = create_subject_fixture(&repository, "corrupt-lived-subject").await;
+            let decision = crate::domain::Decision::new(
+                crate::domain::DecisionId::new("valid-parent-decision").unwrap(),
+                subject.id().clone(),
+                None,
+                "A valid parent decision",
+            )
+            .unwrap();
+            repository.create_decision(&decision, 1).await.unwrap();
+            let valid_outcome = crate::domain::Outcome::new(
+                crate::domain::OutcomeId::new("valid-outcome-before-corruption").unwrap(),
+                subject.id().clone(),
+                decision.id().clone(),
+                "A valid row must not cause a later corrupt row to be skipped.",
+            )
+            .unwrap();
+            repository.create_outcome(&valid_outcome, 2).await.unwrap();
+
+            let mut connection = database.pool.acquire().await.unwrap();
+            sqlx::query("PRAGMA ignore_check_constraints = ON")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO memories VALUES \
+                 ('corrupt-memory', ?, NULL, 'Valid description', ' ', 3)",
+            )
+            .bind(subject.id().as_str())
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO decisions VALUES \
+                 ('corrupt-decision', ?, NULL, ' ', 4)",
+            )
+            .bind(subject.id().as_str())
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO outcomes VALUES \
+                 ('corrupt-outcome', ?, 'valid-parent-decision', ' ', 5)",
+            )
+            .bind(subject.id().as_str())
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+            drop(connection);
+
+            assert_domain_reconstruction(
+                repository
+                    .load_memory(&crate::domain::MemoryId::new("corrupt-memory").unwrap())
+                    .await,
+            );
+            assert_domain_reconstruction(
+                repository
+                    .load_decision(&crate::domain::DecisionId::new("corrupt-decision").unwrap())
+                    .await,
+            );
+            assert_domain_reconstruction(
+                repository
+                    .load_outcome(&crate::domain::OutcomeId::new("corrupt-outcome").unwrap())
+                    .await,
+            );
+            assert_domain_reconstruction(
+                repository.load_outcomes_for_decision(decision.id()).await,
+            );
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn lived_experience_rows_reject_every_invalid_domain_field() {
+        let memory_rows = [
+            MemoryRow {
+                id: " ".into(),
+                subject_id: "subject".into(),
+                situation_id: None,
+                description: "Description".into(),
+                user_meaning: None,
+                created_at_ms: 1,
+            },
+            MemoryRow {
+                id: "memory".into(),
+                subject_id: "\t".into(),
+                situation_id: None,
+                description: "Description".into(),
+                user_meaning: None,
+                created_at_ms: 1,
+            },
+            MemoryRow {
+                id: "memory".into(),
+                subject_id: "subject".into(),
+                situation_id: Some(" ".into()),
+                description: "Description".into(),
+                user_meaning: None,
+                created_at_ms: 1,
+            },
+            MemoryRow {
+                id: "memory".into(),
+                subject_id: "subject".into(),
+                situation_id: None,
+                description: " ".into(),
+                user_meaning: None,
+                created_at_ms: 1,
+            },
+            MemoryRow {
+                id: "memory".into(),
+                subject_id: "subject".into(),
+                situation_id: None,
+                description: "Description".into(),
+                user_meaning: Some("\t".into()),
+                created_at_ms: 1,
+            },
+        ];
+        for row in memory_rows {
+            assert_domain_reconstruction(crate::domain::Memory::try_from(row));
+        }
+
+        let decision_rows = [
+            DecisionRow {
+                id: " ".into(),
+                subject_id: "subject".into(),
+                situation_id: None,
+                description: "Description".into(),
+                created_at_ms: 1,
+            },
+            DecisionRow {
+                id: "decision".into(),
+                subject_id: "\n".into(),
+                situation_id: None,
+                description: "Description".into(),
+                created_at_ms: 1,
+            },
+            DecisionRow {
+                id: "decision".into(),
+                subject_id: "subject".into(),
+                situation_id: Some(" ".into()),
+                description: "Description".into(),
+                created_at_ms: 1,
+            },
+            DecisionRow {
+                id: "decision".into(),
+                subject_id: "subject".into(),
+                situation_id: None,
+                description: "\t".into(),
+                created_at_ms: 1,
+            },
+        ];
+        for row in decision_rows {
+            assert_domain_reconstruction(crate::domain::Decision::try_from(row));
+        }
+
+        let outcome_rows = [
+            OutcomeRow {
+                id: " ".into(),
+                subject_id: "subject".into(),
+                decision_id: "decision".into(),
+                description: "Description".into(),
+                created_at_ms: 1,
+            },
+            OutcomeRow {
+                id: "outcome".into(),
+                subject_id: "\t".into(),
+                decision_id: "decision".into(),
+                description: "Description".into(),
+                created_at_ms: 1,
+            },
+            OutcomeRow {
+                id: "outcome".into(),
+                subject_id: "subject".into(),
+                decision_id: " ".into(),
+                description: "Description".into(),
+                created_at_ms: 1,
+            },
+            OutcomeRow {
+                id: "outcome".into(),
+                subject_id: "subject".into(),
+                decision_id: "decision".into(),
+                description: "\n".into(),
+                created_at_ms: 1,
+            },
+        ];
+        for row in outcome_rows {
+            assert_domain_reconstruction(crate::domain::Outcome::try_from(row));
+        }
+    }
+
+    #[test]
+    fn lived_experience_records_and_storage_order_survive_close_and_reopen() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject = create_subject_fixture(&repository, "durable-lived-subject").await;
+            let situation =
+                create_situation_fixture(&repository, &subject, "durable-lived-situation").await;
+            let memory_without_optional_fields = crate::domain::Memory::new(
+                crate::domain::MemoryId::new("durable-memory-none").unwrap(),
+                subject.id().clone(),
+                None,
+                "A remembered experience without linked context.",
+                None,
+            )
+            .unwrap();
+            let memory_with_optional_fields = crate::domain::Memory::new(
+                crate::domain::MemoryId::new("durable-memory-context").unwrap(),
+                subject.id().clone(),
+                Some(situation.id().clone()),
+                "这段记忆 remains important 🌱",
+                Some("这是我自己写下的 meaning.".into()),
+            )
+            .unwrap();
+            repository
+                .create_memory(&memory_without_optional_fields, 10)
+                .await
+                .unwrap();
+            repository
+                .create_memory(&memory_with_optional_fields, 11)
+                .await
+                .unwrap();
+
+            let decision = crate::domain::Decision::new(
+                crate::domain::DecisionId::new("durable-lived-decision").unwrap(),
+                subject.id().clone(),
+                Some(situation.id().clone()),
+                "我决定 continue with the plan.",
+            )
+            .unwrap();
+            repository.create_decision(&decision, 12).await.unwrap();
+
+            let outcomes = [
+                ("durable-outcome-b", 20_i64),
+                ("durable-outcome-c", 30_i64),
+                ("durable-outcome-a", 20_i64),
+            ]
+            .map(|(id, created_at_ms)| {
+                (
+                    crate::domain::Outcome::new(
+                        crate::domain::OutcomeId::new(id).unwrap(),
+                        subject.id().clone(),
+                        decision.id().clone(),
+                        format!("结果 persisted for {id}"),
+                    )
+                    .unwrap(),
+                    created_at_ms,
+                )
+            });
+            for (outcome, created_at_ms) in &outcomes {
+                repository
+                    .create_outcome(outcome, *created_at_ms)
+                    .await
+                    .unwrap();
+            }
+            drop(repository);
+
+            let database = database.reopen().await;
+            let reopened_repository = SqliteSelfModelRepository::new(SharedSqlitePool {
+                pool: database.pool.clone(),
+            });
+            assert_eq!(
+                reopened_repository
+                    .load_memory(memory_without_optional_fields.id())
+                    .await
+                    .unwrap(),
+                memory_without_optional_fields
+            );
+            assert_eq!(
+                reopened_repository
+                    .load_memory(memory_with_optional_fields.id())
+                    .await
+                    .unwrap(),
+                memory_with_optional_fields
+            );
+            assert_eq!(
+                reopened_repository
+                    .load_decision(decision.id())
+                    .await
+                    .unwrap(),
+                decision
+            );
+            for (outcome, _) in &outcomes {
+                assert_eq!(
+                    reopened_repository
+                        .load_outcome(outcome.id())
+                        .await
+                        .unwrap(),
+                    *outcome
+                );
+            }
+            let ordered_ids = reopened_repository
+                .load_outcomes_for_decision(decision.id())
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|outcome| outcome.id().as_str().to_owned())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                ordered_ids,
+                [
+                    "durable-outcome-a",
+                    "durable-outcome-b",
+                    "durable-outcome-c",
+                ]
+            );
+
+            drop(reopened_repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
     fn missing_loads_return_not_found_for_each_operation_family() {
         tauri::async_runtime::block_on(async {
             let database = migrated_database().await;
@@ -2456,6 +3852,33 @@ mod tests {
                     .await,
                 Err(PersistenceError::NotFound {
                     entity: "Emotion",
+                    ..
+                })
+            ));
+            assert!(matches!(
+                repository
+                    .load_memory(&crate::domain::MemoryId::new("missing").unwrap())
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "Memory",
+                    ..
+                })
+            ));
+            assert!(matches!(
+                repository
+                    .load_decision(&crate::domain::DecisionId::new("missing").unwrap())
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "Decision",
+                    ..
+                })
+            ));
+            assert!(matches!(
+                repository
+                    .load_outcome(&crate::domain::OutcomeId::new("missing").unwrap())
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "Outcome",
                     ..
                 })
             ));

@@ -7,7 +7,7 @@ interface DatabaseStatusResponse {
 export async function initializeDatabase(): Promise<DatabaseStatusResponse> {
   const status = await invoke<DatabaseStatusResponse>("database_status");
 
-  if (status.schemaVersion !== 2) {
+  if (status.schemaVersion !== 3) {
     throw new Error("Local database migration verification failed.");
   }
 

@@ -1,19 +1,24 @@
 mod commitments;
 mod entities;
 mod error;
+mod lived_experience;
 mod primitives;
 
 pub use commitments::{Belief, BeliefRevision, RevisionOrigin, Value, ValueRevision};
 pub use entities::{Emotion, Observation, PersonReference, SelfSubject, Situation, Thought};
 pub use error::ValidationError;
+pub use lived_experience::{Decision, Memory, Outcome};
 pub use primitives::{
-    BeliefEndorsement, BeliefId, BeliefRevisionId, EmotionId, EmotionIntensity, ObservationId,
-    PersonReferenceId, RevisionNumber, SelfSubjectId, SituationId, ThoughtConfidence, ThoughtId,
-    ValueId, ValueImportance, ValueRevisionId,
+    BeliefEndorsement, BeliefId, BeliefRevisionId, DecisionId, EmotionId, EmotionIntensity,
+    MemoryId, ObservationId, OutcomeId, PersonReferenceId, RevisionNumber, SelfSubjectId,
+    SituationId, ThoughtConfidence, ThoughtId, ValueId, ValueImportance, ValueRevisionId,
 };
 
 #[cfg(test)]
 mod commitment_tests;
+
+#[cfg(test)]
+mod lived_experience_tests;
 
 #[cfg(test)]
 mod tests;
