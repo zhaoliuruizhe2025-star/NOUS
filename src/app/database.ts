@@ -1,21 +1,15 @@
-import Database from "@tauri-apps/plugin-sql";
+import { invoke } from "@tauri-apps/api/core";
 
-export const DATABASE_URL = "sqlite:nous.db";
-
-interface AppMetadataRow {
-  value: string;
+interface DatabaseStatusResponse {
+  schemaVersion: number;
 }
 
-export async function initializeDatabase(): Promise<Database> {
-  const database = await Database.load(DATABASE_URL);
-  const rows = await database.select<AppMetadataRow[]>(
-    "SELECT value FROM app_metadata WHERE key = 'schema_version' LIMIT 1",
-  );
+export async function initializeDatabase(): Promise<DatabaseStatusResponse> {
+  const status = await invoke<DatabaseStatusResponse>("database_status");
 
-  if (rows[0]?.value !== "1") {
+  if (status.schemaVersion !== 2) {
     throw new Error("Local database migration verification failed.");
   }
 
-  return database;
+  return status;
 }
-
