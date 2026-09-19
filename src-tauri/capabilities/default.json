@@ -3,10 +3,5 @@
   "identifier": "main-window",
   "description": "Minimal capability for the local NOUS shell",
   "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "sql:allow-load",
-    "sql:allow-select"
-  ]
+  "permissions": ["core:default"]
 }
-
