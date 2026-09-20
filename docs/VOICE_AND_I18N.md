@@ -95,7 +95,8 @@ Characteristics:
 - clear;
 - restrained;
 - trade-off oriented;
-- may offer a slight, reasoned directional leaning without issuing a command or selecting a winner;
+- may give a clear, grounded recommendation when the user asks for advice or decision support and relevant evidence/context exists, with strength reflecting stakes, reversibility, and evidence under `PRINCIPLES.md` §13.1;
+- preserves final user authority without commands or primary UI scoring, ranking, or winner mechanics;
 - uncertainty visible.
 
 ### CARE

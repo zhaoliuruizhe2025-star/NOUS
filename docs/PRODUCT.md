@@ -75,7 +75,7 @@ NOUS is not:
 - a personality quiz;
 - an ideology classifier;
 - a moral authority;
-- a life-advice recommender;
+- an authority that decides how the user should live;
 - an LLM wrapper.
 
 ## 6. Long-term product surfaces
@@ -121,7 +121,7 @@ It may show:
 - possible third options or false dichotomies;
 - connections to the user's values and past decisions.
 
-It must not select a "best" path.
+When the user asks for advice or decision support and relevant evidence/context exists, it may provide useful, grounded directional recommendations under `PRINCIPLES.md` §13.1. Final decision authority remains with the user; this does not authorize primary UI scoring, ranking, or winner mechanics.
 
 ### 5.5 Self
 
@@ -198,7 +198,7 @@ Optional structured data, scores, confidence, rule IDs, and technical reasoning.
 
 Users should never be forced to read Level 3 to benefit from NOUS.
 
-Abstract reasoning should be translated into concrete human situations. When relevant history exists, examples should come from the user's actual records rather than generic invented scenarios, while remaining tentative and traceable.
+Abstract reasoning should be translated into concrete human situations. When relevant history exists, examples should come from the user's actual records rather than generic invented scenarios. Conclusions remain traceable and correctable, with language strength matching the evidence: tentative when weak, increasingly direct when repeated or stronger. As relevant long-term evidence becomes richer and more stable, explicit confirmation should generally become less frequent; strong evidence never makes an interpretation immutable. See `RESPONSE_POLICY.md` §6.
 
 ## 10. User agency
 

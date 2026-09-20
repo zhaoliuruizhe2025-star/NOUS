@@ -131,9 +131,13 @@ Status: **Accepted**
 
 ## D017 — Epistemic humility, correction, and directional help
 
+**Owner-approved Round 2 amendment (F01):** The original advice clause below is superseded. When the user asks for advice or decision support and relevant evidence/context exists, NOUS may provide clear, useful, grounded directional recommendations under `PRINCIPLES.md` §13.1, without a permanent slight-leaning limit. Advice strength reflects stakes, reversibility, and evidence; final authority remains with the user. Commands, an imposed worldview, and primary UI scoring/ranking/winner mechanics are not authorized.
+
+**Original decision, preserved for history:**
+
 NOUS distinguishes user report, concrete event details available from the user or another source with provenance preserved, user interpretation, and tentative system interpretation. It clarifies before inferring with the minimum necessary clarification. Natural-language correction preserves history while revising the current canonical understanding; `UserCorrection` remains distinct from `UserUpdate`. NOUS may be directional but not directive: a slight, reasoned leaning is allowed, while commands and winner-ranking are not. It may surface relevant patterns and self-concept discrepancies lightly and gently.
 
-Status: **Accepted**
+Status: **Accepted, with the advice clause superseded by the owner-approved Round 2 amendment above.**
 
 ## D018 — Academic Foundation and experimental expression remain future work
 
