@@ -1,6 +1,8 @@
 use std::{error::Error, fmt};
 
-use sqlx::{error::ErrorKind, pool::PoolConnection, Connection, Sqlite, SqlitePool};
+use sqlx::{
+    error::ErrorKind, pool::PoolConnection, sqlite::SqliteRow, Connection, Row, Sqlite, SqlitePool,
+};
 use tauri::{Manager, Runtime};
 use tauri_plugin_sql::{DbInstances, DbPool};
 
@@ -840,6 +842,160 @@ impl SqliteSelfModelRepository {
             .collect()
     }
 
+    pub(crate) async fn create_evidence_link(
+        &self,
+        link: &crate::domain::EvidenceLink,
+        created_at_ms: i64,
+    ) -> Result<(), PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let (
+            source_kind,
+            source_observation_id,
+            source_thought_id,
+            source_emotion_id,
+            source_situation_id,
+            source_memory_id,
+            source_decision_id,
+            source_outcome_id,
+        ) = evidence_source_columns(link.source());
+        let (
+            target_kind,
+            target_belief_id,
+            target_belief_revision_id,
+            target_value_id,
+            target_value_revision_id,
+        ) = evidence_target_columns(link.target());
+
+        sqlx::query(
+            "INSERT INTO evidence_links (
+                id, subject_id, relationship_kind, provenance, source_kind,
+                source_observation_id, source_thought_id, source_emotion_id,
+                source_situation_id, source_memory_id, source_decision_id, source_outcome_id,
+                target_kind, target_belief_id, target_belief_revision_id,
+                target_value_id, target_value_revision_id, user_note, created_at_ms
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(link.id().as_str())
+        .bind(link.subject_id().as_str())
+        .bind(evidence_relationship_name(link.relationship()))
+        .bind(evidence_provenance_name(link.provenance()))
+        .bind(source_kind)
+        .bind(source_observation_id)
+        .bind(source_thought_id)
+        .bind(source_emotion_id)
+        .bind(source_situation_id)
+        .bind(source_memory_id)
+        .bind(source_decision_id)
+        .bind(source_outcome_id)
+        .bind(target_kind)
+        .bind(target_belief_id)
+        .bind(target_belief_revision_id)
+        .bind(target_value_id)
+        .bind(target_value_revision_id)
+        .bind(link.user_note())
+        .bind(created_at_ms)
+        .execute(&mut **connection.connection())
+        .await
+        .map_err(|error| write_error("create_evidence_link", error))?;
+        Ok(())
+    }
+
+    pub(crate) async fn load_evidence_link(
+        &self,
+        id: &crate::domain::EvidenceLinkId,
+    ) -> Result<crate::domain::EvidenceLink, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let row: Option<EvidenceLinkRow> = sqlx::query_as(
+            "SELECT id, subject_id, relationship_kind, provenance, source_kind,
+                    source_observation_id, source_thought_id, source_emotion_id,
+                    source_situation_id, source_memory_id, source_decision_id,
+                    source_outcome_id, target_kind, target_belief_id,
+                    target_belief_revision_id, target_value_id,
+                    target_value_revision_id, user_note, created_at_ms
+             FROM evidence_links WHERE id = ?",
+        )
+        .bind(id.as_str())
+        .fetch_optional(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+
+        row.ok_or_else(|| PersistenceError::NotFound {
+            entity: "EvidenceLink",
+            id: id.as_str().to_owned(),
+        })?
+        .try_into()
+    }
+
+    pub(crate) async fn load_evidence_links_for_belief_revision(
+        &self,
+        revision_id: &crate::domain::BeliefRevisionId,
+    ) -> Result<Vec<crate::domain::EvidenceLink>, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let exists: Option<i64> = sqlx::query_scalar("SELECT 1 FROM belief_revisions WHERE id = ?")
+            .bind(revision_id.as_str())
+            .fetch_optional(&mut **connection.connection())
+            .await
+            .map_err(PersistenceError::from)?;
+        if exists.is_none() {
+            return Err(PersistenceError::NotFound {
+                entity: "BeliefRevision",
+                id: revision_id.as_str().to_owned(),
+            });
+        }
+
+        let rows: Vec<EvidenceLinkRow> = sqlx::query_as(
+            "SELECT id, subject_id, relationship_kind, provenance, source_kind,
+                    source_observation_id, source_thought_id, source_emotion_id,
+                    source_situation_id, source_memory_id, source_decision_id,
+                    source_outcome_id, target_kind, target_belief_id,
+                    target_belief_revision_id, target_value_id,
+                    target_value_revision_id, user_note, created_at_ms
+             FROM evidence_links
+             WHERE target_kind = 'BeliefRevision' AND target_belief_revision_id = ?
+             ORDER BY created_at_ms ASC, id ASC",
+        )
+        .bind(revision_id.as_str())
+        .fetch_all(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    pub(crate) async fn load_evidence_links_for_value_revision(
+        &self,
+        revision_id: &crate::domain::ValueRevisionId,
+    ) -> Result<Vec<crate::domain::EvidenceLink>, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let exists: Option<i64> = sqlx::query_scalar("SELECT 1 FROM value_revisions WHERE id = ?")
+            .bind(revision_id.as_str())
+            .fetch_optional(&mut **connection.connection())
+            .await
+            .map_err(PersistenceError::from)?;
+        if exists.is_none() {
+            return Err(PersistenceError::NotFound {
+                entity: "ValueRevision",
+                id: revision_id.as_str().to_owned(),
+            });
+        }
+
+        let rows: Vec<EvidenceLinkRow> = sqlx::query_as(
+            "SELECT id, subject_id, relationship_kind, provenance, source_kind,
+                    source_observation_id, source_thought_id, source_emotion_id,
+                    source_situation_id, source_memory_id, source_decision_id,
+                    source_outcome_id, target_kind, target_belief_id,
+                    target_belief_revision_id, target_value_id,
+                    target_value_revision_id, user_note, created_at_ms
+             FROM evidence_links
+             WHERE target_kind = 'ValueRevision' AND target_value_revision_id = ?
+             ORDER BY created_at_ms ASC, id ASC",
+        )
+        .bind(revision_id.as_str())
+        .fetch_all(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
     pub(crate) async fn create_belief_with_initial_revision(
         &self,
         belief: &crate::domain::Belief,
@@ -1661,6 +1817,456 @@ impl TryFrom<OutcomeRow> for crate::domain::Outcome {
     }
 }
 
+type EvidenceSourceColumns<'a> = (
+    &'static str,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+);
+
+fn evidence_source_columns(source: &crate::domain::EvidenceSource) -> EvidenceSourceColumns<'_> {
+    match source {
+        crate::domain::EvidenceSource::Observation(id) => (
+            "Observation",
+            Some(id.as_str()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        crate::domain::EvidenceSource::Thought(id) => (
+            "Thought",
+            None,
+            Some(id.as_str()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        crate::domain::EvidenceSource::Emotion(id) => (
+            "Emotion",
+            None,
+            None,
+            Some(id.as_str()),
+            None,
+            None,
+            None,
+            None,
+        ),
+        crate::domain::EvidenceSource::Situation(id) => (
+            "Situation",
+            None,
+            None,
+            None,
+            Some(id.as_str()),
+            None,
+            None,
+            None,
+        ),
+        crate::domain::EvidenceSource::Memory(id) => (
+            "Memory",
+            None,
+            None,
+            None,
+            None,
+            Some(id.as_str()),
+            None,
+            None,
+        ),
+        crate::domain::EvidenceSource::Decision(id) => (
+            "Decision",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(id.as_str()),
+            None,
+        ),
+        crate::domain::EvidenceSource::Outcome(id) => (
+            "Outcome",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(id.as_str()),
+        ),
+    }
+}
+
+type EvidenceTargetColumns<'a> = (
+    &'static str,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+);
+
+fn evidence_target_columns(source: &crate::domain::EvidenceTarget) -> EvidenceTargetColumns<'_> {
+    match source {
+        crate::domain::EvidenceTarget::BeliefRevision {
+            belief_id,
+            revision_id,
+        } => (
+            "BeliefRevision",
+            Some(belief_id.as_str()),
+            Some(revision_id.as_str()),
+            None,
+            None,
+        ),
+        crate::domain::EvidenceTarget::ValueRevision {
+            value_id,
+            revision_id,
+        } => (
+            "ValueRevision",
+            None,
+            None,
+            Some(value_id.as_str()),
+            Some(revision_id.as_str()),
+        ),
+    }
+}
+
+fn evidence_relationship_name(relationship: crate::domain::EvidenceRelationKind) -> &'static str {
+    match relationship {
+        crate::domain::EvidenceRelationKind::Supports => "Supports",
+        crate::domain::EvidenceRelationKind::Contradicts => "Contradicts",
+        crate::domain::EvidenceRelationKind::Complicates => "Complicates",
+        crate::domain::EvidenceRelationKind::Contextualizes => "Contextualizes",
+    }
+}
+
+fn evidence_provenance_name(provenance: crate::domain::EvidenceProvenance) -> &'static str {
+    match provenance {
+        crate::domain::EvidenceProvenance::UserAuthored => "UserAuthored",
+    }
+}
+
+#[derive(Clone, Debug)]
+struct EvidenceLinkRow {
+    id: String,
+    subject_id: String,
+    relationship_kind: String,
+    provenance: String,
+    source_kind: String,
+    source_observation_id: Option<String>,
+    source_thought_id: Option<String>,
+    source_emotion_id: Option<String>,
+    source_situation_id: Option<String>,
+    source_memory_id: Option<String>,
+    source_decision_id: Option<String>,
+    source_outcome_id: Option<String>,
+    target_kind: String,
+    target_belief_id: Option<String>,
+    target_belief_revision_id: Option<String>,
+    target_value_id: Option<String>,
+    target_value_revision_id: Option<String>,
+    user_note: Option<String>,
+    created_at_ms: i64,
+}
+
+impl<'row> sqlx::FromRow<'row, SqliteRow> for EvidenceLinkRow {
+    fn from_row(row: &'row SqliteRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            subject_id: row.try_get("subject_id")?,
+            relationship_kind: row.try_get("relationship_kind")?,
+            provenance: row.try_get("provenance")?,
+            source_kind: row.try_get("source_kind")?,
+            source_observation_id: row.try_get("source_observation_id")?,
+            source_thought_id: row.try_get("source_thought_id")?,
+            source_emotion_id: row.try_get("source_emotion_id")?,
+            source_situation_id: row.try_get("source_situation_id")?,
+            source_memory_id: row.try_get("source_memory_id")?,
+            source_decision_id: row.try_get("source_decision_id")?,
+            source_outcome_id: row.try_get("source_outcome_id")?,
+            target_kind: row.try_get("target_kind")?,
+            target_belief_id: row.try_get("target_belief_id")?,
+            target_belief_revision_id: row.try_get("target_belief_revision_id")?,
+            target_value_id: row.try_get("target_value_id")?,
+            target_value_revision_id: row.try_get("target_value_revision_id")?,
+            user_note: row.try_get("user_note")?,
+            created_at_ms: row.try_get("created_at_ms")?,
+        })
+    }
+}
+
+fn evidence_reconstruction(field: &'static str, detail: impl Into<String>) -> PersistenceError {
+    PersistenceError::DomainReconstruction {
+        entity: "EvidenceLink",
+        field,
+        detail: detail.into(),
+    }
+}
+
+impl TryFrom<EvidenceLinkRow> for crate::domain::EvidenceLink {
+    type Error = PersistenceError;
+
+    fn try_from(row: EvidenceLinkRow) -> Result<Self, Self::Error> {
+        let _ = row.created_at_ms;
+        let id = reconstruct(
+            "EvidenceLink",
+            "id",
+            crate::domain::EvidenceLinkId::new(row.id),
+        )?;
+        let subject_id = reconstruct(
+            "EvidenceLink",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(row.subject_id),
+        )?;
+
+        let source_count = [
+            row.source_observation_id.is_some(),
+            row.source_thought_id.is_some(),
+            row.source_emotion_id.is_some(),
+            row.source_situation_id.is_some(),
+            row.source_memory_id.is_some(),
+            row.source_decision_id.is_some(),
+            row.source_outcome_id.is_some(),
+        ]
+        .into_iter()
+        .filter(|present| *present)
+        .count();
+        if source_count != 1 {
+            return Err(evidence_reconstruction(
+                "source",
+                format!("expected exactly one typed source column, found {source_count}"),
+            ));
+        }
+        let source = match row.source_kind.as_str() {
+            "Observation"
+                if row.source_thought_id.is_none()
+                    && row.source_emotion_id.is_none()
+                    && row.source_situation_id.is_none()
+                    && row.source_memory_id.is_none()
+                    && row.source_decision_id.is_none()
+                    && row.source_outcome_id.is_none() =>
+            {
+                let value = row.source_observation_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Observation source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Observation(reconstruct(
+                    "EvidenceLink",
+                    "source_observation_id",
+                    crate::domain::ObservationId::new(value),
+                )?)
+            }
+            "Thought"
+                if row.source_observation_id.is_none()
+                    && row.source_emotion_id.is_none()
+                    && row.source_situation_id.is_none()
+                    && row.source_memory_id.is_none()
+                    && row.source_decision_id.is_none()
+                    && row.source_outcome_id.is_none() =>
+            {
+                let value = row.source_thought_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Thought source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Thought(reconstruct(
+                    "EvidenceLink",
+                    "source_thought_id",
+                    crate::domain::ThoughtId::new(value),
+                )?)
+            }
+            "Emotion"
+                if row.source_observation_id.is_none()
+                    && row.source_thought_id.is_none()
+                    && row.source_situation_id.is_none()
+                    && row.source_memory_id.is_none()
+                    && row.source_decision_id.is_none()
+                    && row.source_outcome_id.is_none() =>
+            {
+                let value = row.source_emotion_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Emotion source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Emotion(reconstruct(
+                    "EvidenceLink",
+                    "source_emotion_id",
+                    crate::domain::EmotionId::new(value),
+                )?)
+            }
+            "Situation"
+                if row.source_observation_id.is_none()
+                    && row.source_thought_id.is_none()
+                    && row.source_emotion_id.is_none()
+                    && row.source_memory_id.is_none()
+                    && row.source_decision_id.is_none()
+                    && row.source_outcome_id.is_none() =>
+            {
+                let value = row.source_situation_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Situation source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Situation(reconstruct(
+                    "EvidenceLink",
+                    "source_situation_id",
+                    crate::domain::SituationId::new(value),
+                )?)
+            }
+            "Memory"
+                if row.source_observation_id.is_none()
+                    && row.source_thought_id.is_none()
+                    && row.source_emotion_id.is_none()
+                    && row.source_situation_id.is_none()
+                    && row.source_decision_id.is_none()
+                    && row.source_outcome_id.is_none() =>
+            {
+                let value = row.source_memory_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Memory source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Memory(reconstruct(
+                    "EvidenceLink",
+                    "source_memory_id",
+                    crate::domain::MemoryId::new(value),
+                )?)
+            }
+            "Decision"
+                if row.source_observation_id.is_none()
+                    && row.source_thought_id.is_none()
+                    && row.source_emotion_id.is_none()
+                    && row.source_situation_id.is_none()
+                    && row.source_memory_id.is_none()
+                    && row.source_outcome_id.is_none() =>
+            {
+                let value = row.source_decision_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Decision source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Decision(reconstruct(
+                    "EvidenceLink",
+                    "source_decision_id",
+                    crate::domain::DecisionId::new(value),
+                )?)
+            }
+            "Outcome"
+                if row.source_observation_id.is_none()
+                    && row.source_thought_id.is_none()
+                    && row.source_emotion_id.is_none()
+                    && row.source_situation_id.is_none()
+                    && row.source_memory_id.is_none()
+                    && row.source_decision_id.is_none() =>
+            {
+                let value = row.source_outcome_id.ok_or_else(|| {
+                    evidence_reconstruction("source", "Outcome source ID is absent")
+                })?;
+                crate::domain::EvidenceSource::Outcome(reconstruct(
+                    "EvidenceLink",
+                    "source_outcome_id",
+                    crate::domain::OutcomeId::new(value),
+                )?)
+            }
+            _ => {
+                return Err(evidence_reconstruction(
+                    "source",
+                    format!(
+                        "unknown source kind or inconsistent typed source columns: {}",
+                        row.source_kind
+                    ),
+                ));
+            }
+        };
+
+        let target = match row.target_kind.as_str() {
+            "BeliefRevision"
+                if row.target_value_id.is_none() && row.target_value_revision_id.is_none() =>
+            {
+                let belief_id = row.target_belief_id.ok_or_else(|| {
+                    evidence_reconstruction("target", "Belief target anchor ID is absent")
+                })?;
+                let revision_id = row.target_belief_revision_id.ok_or_else(|| {
+                    evidence_reconstruction("target", "Belief target revision ID is absent")
+                })?;
+                crate::domain::EvidenceTarget::BeliefRevision {
+                    belief_id: reconstruct(
+                        "EvidenceLink",
+                        "target_belief_id",
+                        crate::domain::BeliefId::new(belief_id),
+                    )?,
+                    revision_id: reconstruct(
+                        "EvidenceLink",
+                        "target_belief_revision_id",
+                        crate::domain::BeliefRevisionId::new(revision_id),
+                    )?,
+                }
+            }
+            "ValueRevision"
+                if row.target_belief_id.is_none() && row.target_belief_revision_id.is_none() =>
+            {
+                let value_id = row.target_value_id.ok_or_else(|| {
+                    evidence_reconstruction("target", "Value target anchor ID is absent")
+                })?;
+                let revision_id = row.target_value_revision_id.ok_or_else(|| {
+                    evidence_reconstruction("target", "Value target revision ID is absent")
+                })?;
+                crate::domain::EvidenceTarget::ValueRevision {
+                    value_id: reconstruct(
+                        "EvidenceLink",
+                        "target_value_id",
+                        crate::domain::ValueId::new(value_id),
+                    )?,
+                    revision_id: reconstruct(
+                        "EvidenceLink",
+                        "target_value_revision_id",
+                        crate::domain::ValueRevisionId::new(revision_id),
+                    )?,
+                }
+            }
+            _ => {
+                return Err(evidence_reconstruction(
+                    "target",
+                    format!(
+                        "unknown target kind or inconsistent typed target columns: {}",
+                        row.target_kind
+                    ),
+                ));
+            }
+        };
+
+        let relationship = match row.relationship_kind.as_str() {
+            "Supports" => crate::domain::EvidenceRelationKind::Supports,
+            "Contradicts" => crate::domain::EvidenceRelationKind::Contradicts,
+            "Complicates" => crate::domain::EvidenceRelationKind::Complicates,
+            "Contextualizes" => crate::domain::EvidenceRelationKind::Contextualizes,
+            _ => {
+                return Err(evidence_reconstruction(
+                    "relationship",
+                    format!("unknown relationship kind: {}", row.relationship_kind),
+                ));
+            }
+        };
+        let provenance = match row.provenance.as_str() {
+            "UserAuthored" => crate::domain::EvidenceProvenance::UserAuthored,
+            _ => {
+                return Err(evidence_reconstruction(
+                    "provenance",
+                    format!("unknown provenance: {}", row.provenance),
+                ));
+            }
+        };
+
+        reconstruct(
+            "EvidenceLink",
+            "fields",
+            crate::domain::EvidenceLink::new(
+                id,
+                subject_id,
+                source,
+                target,
+                relationship,
+                provenance,
+                row.user_note,
+            ),
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct BeliefRevisionRow {
     pub(crate) id: String,
@@ -1897,11 +2503,13 @@ mod tests {
     const MIGRATION_0002: &str = include_str!("../migrations/0002_create_self_model.sql");
     const MIGRATION_0003: &str =
         include_str!("../migrations/0003_create_lived_experience_records.sql");
+    const MIGRATION_0004: &str = include_str!("../migrations/0004_create_evidence_links.sql");
 
     type ColumnExpectation = (&'static str, &'static str, i64, i64);
     type TableColumnExpectations = (&'static str, &'static [ColumnExpectation]);
     type ForeignKeyExpectation = (&'static str, &'static str, &'static str, &'static str);
     type TableForeignKeyExpectations = (&'static str, &'static [ForeignKeyExpectation]);
+    type ForeignKeyGroup = (String, Vec<(String, String)>, String);
 
     struct TempDatabase {
         directory: PathBuf,
@@ -1971,6 +2579,7 @@ mod tests {
         database.apply(MIGRATION_0001).await;
         database.apply(MIGRATION_0002).await;
         database.apply(MIGRATION_0003).await;
+        database.apply(MIGRATION_0004).await;
         database
     }
 
@@ -2005,6 +2614,15 @@ mod tests {
         for table in ["memories", "decisions", "outcomes"] {
             assert!(tables.iter().any(|found| found == table), "missing {table}");
         }
+    }
+
+    async fn assert_task006_table_exists(pool: &SqlitePool) {
+        let tables: Vec<String> =
+            sqlx::query_scalar("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+                .fetch_all(pool)
+                .await
+                .unwrap();
+        assert!(tables.iter().any(|found| found == "evidence_links"));
     }
 
     async fn table_columns(pool: &SqlitePool, table: &str) -> Vec<(String, String, i64, i64)> {
@@ -2046,6 +2664,35 @@ mod tests {
             indexes.push(columns);
         }
         indexes
+    }
+
+    async fn index_columns(pool: &SqlitePool, index: &str) -> Vec<String> {
+        sqlx::query_scalar("SELECT name FROM pragma_index_info(?) ORDER BY seqno")
+            .bind(index)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn foreign_key_groups(pool: &SqlitePool, table: &str) -> Vec<ForeignKeyGroup> {
+        let rows: Vec<(i64, i64, String, String, String, String)> = sqlx::query_as(
+            "SELECT id, seq, \"table\", \"from\", \"to\", on_delete \
+             FROM pragma_foreign_key_list(?) ORDER BY id, seq",
+        )
+        .bind(table)
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        let mut groups: Vec<ForeignKeyGroup> = Vec::new();
+        for (id, _, parent, from, to, on_delete) in rows {
+            if let Some((_, columns, _)) = groups.get_mut(id as usize) {
+                columns.push((from, to));
+            } else {
+                assert_eq!(id as usize, groups.len());
+                groups.push((parent, vec![(from, to)], on_delete));
+            }
+        }
+        groups
     }
 
     fn repository(database: &TempDatabase) -> SqliteSelfModelRepository {
@@ -2117,6 +2764,239 @@ mod tests {
             .expect("the SQLx SQLite URL fixture should be valid")
     }
 
+    async fn seed_evidence_records(pool: &SqlitePool) {
+        sqlx::raw_sql(
+            "INSERT INTO self_subjects (id, display_name, created_at_ms) VALUES
+                ('subject-a', 'Subject A', 1),
+                ('subject-b', 'Subject B', 2);
+             INSERT INTO situations (id, subject_id, description, created_at_ms) VALUES
+                ('situation-a', 'subject-a', 'Situation A', 3),
+                ('situation-b', 'subject-b', 'Situation B', 4);
+             INSERT INTO observations
+                (id, subject_id, situation_id, content, created_at_ms) VALUES
+                ('observation-a', 'subject-a', NULL, 'Observation A', 5),
+                ('observation-b', 'subject-b', NULL, 'Observation B', 6);
+             INSERT INTO thoughts
+                (id, subject_id, situation_id, content, confidence, created_at_ms) VALUES
+                ('thought-a', 'subject-a', NULL, 'Thought A', NULL, 7),
+                ('thought-b', 'subject-b', NULL, 'Thought B', NULL, 8);
+             INSERT INTO emotions
+                (id, subject_id, situation_id, label, intensity, created_at_ms) VALUES
+                ('emotion-a', 'subject-a', NULL, 'Emotion A', 50, 9),
+                ('emotion-b', 'subject-b', NULL, 'Emotion B', 50, 10);
+             INSERT INTO memories
+                (id, subject_id, situation_id, description, user_meaning, created_at_ms) VALUES
+                ('memory-a', 'subject-a', NULL, 'Memory A', NULL, 11),
+                ('memory-b', 'subject-b', NULL, 'Memory B', NULL, 12);
+             INSERT INTO decisions
+                (id, subject_id, situation_id, description, created_at_ms) VALUES
+                ('decision-a', 'subject-a', NULL, 'Decision A', 13),
+                ('decision-b', 'subject-b', NULL, 'Decision B', 14);
+             INSERT INTO outcomes
+                (id, subject_id, decision_id, description, created_at_ms) VALUES
+                ('outcome-a', 'subject-a', 'decision-a', 'Outcome A', 15),
+                ('outcome-b', 'subject-b', 'decision-b', 'Outcome B', 16);
+             INSERT INTO beliefs (id, subject_id, created_at_ms) VALUES
+                ('belief-a', 'subject-a', 17),
+                ('belief-a-other', 'subject-a', 18),
+                ('belief-b', 'subject-b', 19);
+             INSERT INTO belief_revisions
+                (id, belief_id, revision_number, proposition, endorsement, change_note, origin, created_at_ms) VALUES
+                ('belief-revision-a', 'belief-a', 1, 'Belief A', NULL, NULL, 'InitialUserEntry', 20),
+                ('belief-revision-a-other', 'belief-a-other', 1, 'Other Belief A', NULL, NULL, 'InitialUserEntry', 21),
+                ('belief-revision-b', 'belief-b', 1, 'Belief B', NULL, NULL, 'InitialUserEntry', 22);
+             INSERT INTO \"values\" (id, subject_id, created_at_ms) VALUES
+                ('value-a', 'subject-a', 23),
+                ('value-a-other', 'subject-a', 24),
+                ('value-b', 'subject-b', 25);
+             INSERT INTO value_revisions
+                (id, value_id, revision_number, label, importance, change_note, origin, created_at_ms) VALUES
+                ('value-revision-a', 'value-a', 1, 'Value A', NULL, NULL, 'InitialUserEntry', 26),
+                ('value-revision-a-other', 'value-a-other', 1, 'Other Value A', NULL, NULL, 'InitialUserEntry', 27),
+                ('value-revision-b', 'value-b', 1, 'Value B', NULL, NULL, 'InitialUserEntry', 28);",
+        )
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[derive(Clone)]
+    struct EvidenceInsert {
+        id: String,
+        subject_id: String,
+        relationship_kind: String,
+        provenance: String,
+        source_kind: String,
+        source_observation_id: Option<String>,
+        source_thought_id: Option<String>,
+        source_emotion_id: Option<String>,
+        source_situation_id: Option<String>,
+        source_memory_id: Option<String>,
+        source_decision_id: Option<String>,
+        source_outcome_id: Option<String>,
+        target_kind: String,
+        target_belief_id: Option<String>,
+        target_belief_revision_id: Option<String>,
+        target_value_id: Option<String>,
+        target_value_revision_id: Option<String>,
+        user_note: Option<String>,
+        created_at_ms: i64,
+    }
+
+    impl EvidenceInsert {
+        fn new(
+            id: impl Into<String>,
+            subject_id: &str,
+            source_kind: &str,
+            source_id: &str,
+            target_kind: &str,
+            relationship_kind: &str,
+        ) -> Self {
+            let mut row = Self {
+                id: id.into(),
+                subject_id: subject_id.to_owned(),
+                relationship_kind: relationship_kind.to_owned(),
+                provenance: "UserAuthored".to_owned(),
+                source_kind: source_kind.to_owned(),
+                source_observation_id: None,
+                source_thought_id: None,
+                source_emotion_id: None,
+                source_situation_id: None,
+                source_memory_id: None,
+                source_decision_id: None,
+                source_outcome_id: None,
+                target_kind: target_kind.to_owned(),
+                target_belief_id: None,
+                target_belief_revision_id: None,
+                target_value_id: None,
+                target_value_revision_id: None,
+                user_note: None,
+                created_at_ms: 100,
+            };
+            match source_kind {
+                "Observation" => row.source_observation_id = Some(source_id.to_owned()),
+                "Thought" => row.source_thought_id = Some(source_id.to_owned()),
+                "Emotion" => row.source_emotion_id = Some(source_id.to_owned()),
+                "Situation" => row.source_situation_id = Some(source_id.to_owned()),
+                "Memory" => row.source_memory_id = Some(source_id.to_owned()),
+                "Decision" => row.source_decision_id = Some(source_id.to_owned()),
+                "Outcome" => row.source_outcome_id = Some(source_id.to_owned()),
+                other => panic!("unsupported evidence fixture source {other}"),
+            }
+            match (target_kind, subject_id) {
+                ("BeliefRevision", "subject-a") => {
+                    row.target_belief_id = Some("belief-a".to_owned());
+                    row.target_belief_revision_id = Some("belief-revision-a".to_owned());
+                }
+                ("BeliefRevision", "subject-b") => {
+                    row.target_belief_id = Some("belief-b".to_owned());
+                    row.target_belief_revision_id = Some("belief-revision-b".to_owned());
+                }
+                ("ValueRevision", "subject-a") => {
+                    row.target_value_id = Some("value-a".to_owned());
+                    row.target_value_revision_id = Some("value-revision-a".to_owned());
+                }
+                ("ValueRevision", "subject-b") => {
+                    row.target_value_id = Some("value-b".to_owned());
+                    row.target_value_revision_id = Some("value-revision-b".to_owned());
+                }
+                _ => panic!("unsupported evidence fixture target"),
+            }
+            row
+        }
+
+        async fn execute(
+            &self,
+            pool: &SqlitePool,
+        ) -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
+            sqlx::query(
+                "INSERT INTO evidence_links (
+                    id, subject_id, relationship_kind, provenance, source_kind,
+                    source_observation_id, source_thought_id, source_emotion_id,
+                    source_situation_id, source_memory_id, source_decision_id, source_outcome_id,
+                    target_kind, target_belief_id, target_belief_revision_id,
+                    target_value_id, target_value_revision_id, user_note, created_at_ms
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&self.id)
+            .bind(&self.subject_id)
+            .bind(&self.relationship_kind)
+            .bind(&self.provenance)
+            .bind(&self.source_kind)
+            .bind(self.source_observation_id.as_deref())
+            .bind(self.source_thought_id.as_deref())
+            .bind(self.source_emotion_id.as_deref())
+            .bind(self.source_situation_id.as_deref())
+            .bind(self.source_memory_id.as_deref())
+            .bind(self.source_decision_id.as_deref())
+            .bind(self.source_outcome_id.as_deref())
+            .bind(&self.target_kind)
+            .bind(self.target_belief_id.as_deref())
+            .bind(self.target_belief_revision_id.as_deref())
+            .bind(self.target_value_id.as_deref())
+            .bind(self.target_value_revision_id.as_deref())
+            .bind(self.user_note.as_deref())
+            .bind(self.created_at_ms)
+            .execute(pool)
+            .await
+        }
+    }
+
+    fn evidence_link(
+        id: &str,
+        subject_id: &str,
+        source: crate::domain::EvidenceSource,
+        target: crate::domain::EvidenceTarget,
+        relationship: crate::domain::EvidenceRelationKind,
+        user_note: Option<&str>,
+    ) -> crate::domain::EvidenceLink {
+        crate::domain::EvidenceLink::new(
+            crate::domain::EvidenceLinkId::new(id).unwrap(),
+            crate::domain::SelfSubjectId::new(subject_id).unwrap(),
+            source,
+            target,
+            relationship,
+            crate::domain::EvidenceProvenance::UserAuthored,
+            user_note.map(str::to_owned),
+        )
+        .unwrap()
+    }
+
+    fn belief_evidence_target(belief_id: &str, revision_id: &str) -> crate::domain::EvidenceTarget {
+        crate::domain::EvidenceTarget::BeliefRevision {
+            belief_id: crate::domain::BeliefId::new(belief_id).unwrap(),
+            revision_id: crate::domain::BeliefRevisionId::new(revision_id).unwrap(),
+        }
+    }
+
+    fn value_evidence_target(value_id: &str, revision_id: &str) -> crate::domain::EvidenceTarget {
+        crate::domain::EvidenceTarget::ValueRevision {
+            value_id: crate::domain::ValueId::new(value_id).unwrap(),
+            revision_id: crate::domain::ValueRevisionId::new(revision_id).unwrap(),
+        }
+    }
+
+    async fn apply_test_only_evidence_corruption(pool: &SqlitePool, sql: &str) {
+        let mut connection = pool.acquire().await.unwrap();
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+        sqlx::query("PRAGMA ignore_check_constraints = ON")
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+        sqlx::raw_sql(sql).execute(&mut *connection).await.unwrap();
+        sqlx::query("PRAGMA ignore_check_constraints = OFF")
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+        sqlx::query("PRAGMA foreign_keys = ON")
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+    }
+
     #[test]
     fn resolves_the_exact_preloaded_database_as_the_direct_sqlx_pool_type() {
         tauri::async_runtime::block_on(async {
@@ -2161,6 +3041,7 @@ mod tests {
             let database = migrated_database().await;
             assert_task004_tables_exist(&database.pool).await;
             assert_task005_tables_exist(&database.pool).await;
+            assert_task006_table_exists(&database.pool).await;
             let tables: Vec<String> = sqlx::query_scalar(
                 "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
             )
@@ -2175,6 +3056,7 @@ mod tests {
                     "beliefs",
                     "decisions",
                     "emotions",
+                    "evidence_links",
                     "memories",
                     "observations",
                     "outcomes",
@@ -2191,7 +3073,7 @@ mod tests {
                     .fetch_one(&database.pool)
                     .await
                     .unwrap();
-            assert_eq!(version, "3");
+            assert_eq!(version, "4");
             database.close().await;
         });
     }
@@ -2334,6 +3216,30 @@ mod tests {
                         ("created_at_ms", "INTEGER", 1, 0),
                     ],
                 ),
+                (
+                    "evidence_links",
+                    &[
+                        ("id", "TEXT", 1, 1),
+                        ("subject_id", "TEXT", 1, 0),
+                        ("relationship_kind", "TEXT", 1, 0),
+                        ("provenance", "TEXT", 1, 0),
+                        ("source_kind", "TEXT", 1, 0),
+                        ("source_observation_id", "TEXT", 0, 0),
+                        ("source_thought_id", "TEXT", 0, 0),
+                        ("source_emotion_id", "TEXT", 0, 0),
+                        ("source_situation_id", "TEXT", 0, 0),
+                        ("source_memory_id", "TEXT", 0, 0),
+                        ("source_decision_id", "TEXT", 0, 0),
+                        ("source_outcome_id", "TEXT", 0, 0),
+                        ("target_kind", "TEXT", 1, 0),
+                        ("target_belief_id", "TEXT", 0, 0),
+                        ("target_belief_revision_id", "TEXT", 0, 0),
+                        ("target_value_id", "TEXT", 0, 0),
+                        ("target_value_revision_id", "TEXT", 0, 0),
+                        ("user_note", "TEXT", 0, 0),
+                        ("created_at_ms", "INTEGER", 1, 0),
+                    ],
+                ),
             ];
             for (table, expected) in expected_columns {
                 let actual = table_columns(&database.pool, table).await;
@@ -2424,6 +3330,49 @@ mod tests {
                         ("decisions", "subject_id", "subject_id", "RESTRICT"),
                     ],
                 ),
+                (
+                    "evidence_links",
+                    &[
+                        ("self_subjects", "subject_id", "id", "RESTRICT"),
+                        ("observations", "source_observation_id", "id", "RESTRICT"),
+                        ("observations", "subject_id", "subject_id", "RESTRICT"),
+                        ("thoughts", "source_thought_id", "id", "RESTRICT"),
+                        ("thoughts", "subject_id", "subject_id", "RESTRICT"),
+                        ("emotions", "source_emotion_id", "id", "RESTRICT"),
+                        ("emotions", "subject_id", "subject_id", "RESTRICT"),
+                        ("situations", "source_situation_id", "id", "RESTRICT"),
+                        ("situations", "subject_id", "subject_id", "RESTRICT"),
+                        ("memories", "source_memory_id", "id", "RESTRICT"),
+                        ("memories", "subject_id", "subject_id", "RESTRICT"),
+                        ("decisions", "source_decision_id", "id", "RESTRICT"),
+                        ("decisions", "subject_id", "subject_id", "RESTRICT"),
+                        ("outcomes", "source_outcome_id", "id", "RESTRICT"),
+                        ("outcomes", "subject_id", "subject_id", "RESTRICT"),
+                        ("beliefs", "target_belief_id", "id", "RESTRICT"),
+                        ("beliefs", "subject_id", "subject_id", "RESTRICT"),
+                        (
+                            "belief_revisions",
+                            "target_belief_revision_id",
+                            "id",
+                            "RESTRICT",
+                        ),
+                        (
+                            "belief_revisions",
+                            "target_belief_id",
+                            "belief_id",
+                            "RESTRICT",
+                        ),
+                        ("values", "target_value_id", "id", "RESTRICT"),
+                        ("values", "subject_id", "subject_id", "RESTRICT"),
+                        (
+                            "value_revisions",
+                            "target_value_revision_id",
+                            "id",
+                            "RESTRICT",
+                        ),
+                        ("value_revisions", "target_value_id", "value_id", "RESTRICT"),
+                    ],
+                ),
             ];
             for (table, expected) in expected_foreign_keys {
                 let actual = foreign_keys(&database.pool, table).await;
@@ -2452,22 +3401,41 @@ mod tests {
                 named_indexes,
                 [
                     "belief_revisions_belief_id_idx",
+                    "belief_revisions_id_belief_unique_idx",
+                    "beliefs_id_subject_unique_idx",
                     "beliefs_subject_id_idx",
                     "decisions_situation_subject_idx",
                     "decisions_subject_id_idx",
+                    "emotions_id_subject_unique_idx",
                     "emotions_situation_subject_idx",
                     "emotions_subject_id_idx",
+                    "evidence_links_belief_revision_target_idx",
+                    "evidence_links_source_decision_subject_idx",
+                    "evidence_links_source_emotion_subject_idx",
+                    "evidence_links_source_memory_subject_idx",
+                    "evidence_links_source_observation_subject_idx",
+                    "evidence_links_source_outcome_subject_idx",
+                    "evidence_links_source_situation_subject_idx",
+                    "evidence_links_source_thought_subject_idx",
+                    "evidence_links_subject_id_idx",
+                    "evidence_links_value_revision_target_idx",
+                    "memories_id_subject_unique_idx",
                     "memories_situation_subject_idx",
                     "memories_subject_id_idx",
+                    "observations_id_subject_unique_idx",
                     "observations_situation_subject_idx",
                     "observations_subject_id_idx",
                     "outcomes_decision_subject_idx",
+                    "outcomes_id_subject_unique_idx",
                     "outcomes_subject_id_idx",
                     "person_references_subject_id_idx",
                     "situations_subject_id_idx",
+                    "thoughts_id_subject_unique_idx",
                     "thoughts_situation_subject_idx",
                     "thoughts_subject_id_idx",
+                    "value_revisions_id_value_unique_idx",
                     "value_revisions_value_id_idx",
+                    "values_id_subject_unique_idx",
                     "values_subject_id_idx",
                 ]
             );
@@ -2484,6 +3452,181 @@ mod tests {
             assert!(unique_index_columns(&database.pool, "decisions")
                 .await
                 .contains(&vec!["id".into(), "subject_id".into()]));
+            for table in [
+                "observations",
+                "thoughts",
+                "emotions",
+                "memories",
+                "outcomes",
+                "beliefs",
+                "values",
+            ] {
+                assert!(unique_index_columns(&database.pool, table)
+                    .await
+                    .contains(&vec!["id".into(), "subject_id".into()]));
+            }
+            assert!(unique_index_columns(&database.pool, "belief_revisions")
+                .await
+                .contains(&vec!["id".into(), "belief_id".into()]));
+            assert!(unique_index_columns(&database.pool, "value_revisions")
+                .await
+                .contains(&vec!["id".into(), "value_id".into()]));
+
+            for (index, expected) in [
+                (
+                    "observations_id_subject_unique_idx",
+                    vec!["id", "subject_id"],
+                ),
+                ("thoughts_id_subject_unique_idx", vec!["id", "subject_id"]),
+                ("emotions_id_subject_unique_idx", vec!["id", "subject_id"]),
+                ("memories_id_subject_unique_idx", vec!["id", "subject_id"]),
+                ("outcomes_id_subject_unique_idx", vec!["id", "subject_id"]),
+                ("beliefs_id_subject_unique_idx", vec!["id", "subject_id"]),
+                (
+                    "belief_revisions_id_belief_unique_idx",
+                    vec!["id", "belief_id"],
+                ),
+                ("values_id_subject_unique_idx", vec!["id", "subject_id"]),
+                (
+                    "value_revisions_id_value_unique_idx",
+                    vec!["id", "value_id"],
+                ),
+                (
+                    "evidence_links_source_observation_subject_idx",
+                    vec!["source_observation_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_source_thought_subject_idx",
+                    vec!["source_thought_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_source_emotion_subject_idx",
+                    vec!["source_emotion_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_source_situation_subject_idx",
+                    vec!["source_situation_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_source_memory_subject_idx",
+                    vec!["source_memory_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_source_decision_subject_idx",
+                    vec!["source_decision_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_source_outcome_subject_idx",
+                    vec!["source_outcome_id", "subject_id"],
+                ),
+                (
+                    "evidence_links_belief_revision_target_idx",
+                    vec!["target_belief_revision_id", "target_belief_id"],
+                ),
+                (
+                    "evidence_links_value_revision_target_idx",
+                    vec!["target_value_revision_id", "target_value_id"],
+                ),
+            ] {
+                assert_eq!(index_columns(&database.pool, index).await, expected);
+            }
+
+            let evidence_foreign_keys = foreign_key_groups(&database.pool, "evidence_links").await;
+            for expected in [
+                (
+                    "observations".to_owned(),
+                    vec![
+                        ("source_observation_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "situations".to_owned(),
+                    vec![
+                        ("source_situation_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "thoughts".to_owned(),
+                    vec![
+                        ("source_thought_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "emotions".to_owned(),
+                    vec![
+                        ("source_emotion_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "memories".to_owned(),
+                    vec![
+                        ("source_memory_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "decisions".to_owned(),
+                    vec![
+                        ("source_decision_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "outcomes".to_owned(),
+                    vec![
+                        ("source_outcome_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "beliefs".to_owned(),
+                    vec![
+                        ("target_belief_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "belief_revisions".to_owned(),
+                    vec![
+                        ("target_belief_revision_id".to_owned(), "id".to_owned()),
+                        ("target_belief_id".to_owned(), "belief_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "values".to_owned(),
+                    vec![
+                        ("target_value_id".to_owned(), "id".to_owned()),
+                        ("subject_id".to_owned(), "subject_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+                (
+                    "value_revisions".to_owned(),
+                    vec![
+                        ("target_value_revision_id".to_owned(), "id".to_owned()),
+                        ("target_value_id".to_owned(), "value_id".to_owned()),
+                    ],
+                    "RESTRICT".to_owned(),
+                ),
+            ] {
+                assert!(
+                    evidence_foreign_keys.contains(&expected),
+                    "missing evidence FK {expected:?}"
+                );
+            }
 
             database.close().await;
         });
@@ -2540,6 +3683,64 @@ mod tests {
     }
 
     #[test]
+    fn version_three_database_upgrades_through_the_real_fourth_migration() {
+        tauri::async_runtime::block_on(async {
+            let database = TempDatabase::open().await;
+            database.apply(MIGRATION_0001).await;
+            database.apply(MIGRATION_0002).await;
+            database.apply(MIGRATION_0003).await;
+            sqlx::query(
+                "INSERT INTO self_subjects (id, display_name, created_at_ms) \
+                 VALUES ('preserved-subject', 'Preserved', 1)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            let before: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+            )
+            .fetch_all(&database.pool)
+            .await
+            .unwrap();
+            let version: String =
+                sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(version, "3");
+
+            database.apply(MIGRATION_0004).await;
+            let after: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+            )
+            .fetch_all(&database.pool)
+            .await
+            .unwrap();
+            let added = after
+                .iter()
+                .filter(|table| !before.contains(table))
+                .cloned()
+                .collect::<Vec<_>>();
+            assert_eq!(added, ["evidence_links"]);
+            let display_name: String =
+                sqlx::query_scalar("SELECT display_name FROM self_subjects WHERE id = ?")
+                    .bind("preserved-subject")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(display_name, "Preserved");
+            let version: String =
+                sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(version, "4");
+
+            database.close().await;
+        });
+    }
+
+    #[test]
     fn real_second_migration_failure_is_surfaced_and_does_not_report_version_two() {
         tauri::async_runtime::block_on(async {
             let database = TempDatabase::open().await;
@@ -2582,6 +3783,1123 @@ mod tests {
                     .unwrap();
             assert_eq!(version, "2");
 
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn real_fourth_migration_failure_is_surfaced_and_does_not_report_version_four() {
+        tauri::async_runtime::block_on(async {
+            let database = TempDatabase::open().await;
+            database.apply(MIGRATION_0001).await;
+            database.apply(MIGRATION_0002).await;
+            database.apply(MIGRATION_0003).await;
+            sqlx::query("CREATE TABLE evidence_links (id TEXT PRIMARY KEY)")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+
+            let failure = sqlx::raw_sql(MIGRATION_0004).execute(&database.pool).await;
+            assert!(failure.is_err());
+            let version: String =
+                sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+            assert_eq!(version, "3");
+
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn fourth_migration_enforces_closed_matrix_subject_ownership_and_duplicate_policy() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let sources = [
+                ("Observation", "observation-a"),
+                ("Thought", "thought-a"),
+                ("Emotion", "emotion-a"),
+                ("Situation", "situation-a"),
+                ("Memory", "memory-a"),
+                ("Decision", "decision-a"),
+                ("Outcome", "outcome-a"),
+            ];
+            let relationships = ["Supports", "Contradicts", "Complicates", "Contextualizes"];
+
+            for (source_index, (source_kind, source_id)) in sources.iter().enumerate() {
+                for (target_index, target_kind) in
+                    ["BeliefRevision", "ValueRevision"].iter().enumerate()
+                {
+                    for (relationship_index, relationship) in relationships.iter().enumerate() {
+                        let id =
+                            format!("matrix-{source_index}-{target_index}-{relationship_index}");
+                        let result = EvidenceInsert::new(
+                            id,
+                            "subject-a",
+                            source_kind,
+                            source_id,
+                            target_kind,
+                            relationship,
+                        )
+                        .execute(&database.pool)
+                        .await;
+                        let allowed = !matches!(*source_kind, "Situation" | "Emotion")
+                            || *relationship == "Contextualizes";
+                        assert_eq!(
+                            result.is_ok(),
+                            allowed,
+                            "unexpected matrix result for {source_kind}/{relationship}/{target_kind}"
+                        );
+                    }
+                }
+            }
+
+            for (source_index, (source_kind, source_id)) in sources.iter().enumerate() {
+                let relationship = if matches!(*source_kind, "Situation" | "Emotion") {
+                    "Contextualizes"
+                } else {
+                    "Supports"
+                };
+                for (target_index, target_kind) in
+                    ["BeliefRevision", "ValueRevision"].iter().enumerate()
+                {
+                    let result = EvidenceInsert::new(
+                        format!("cross-source-{source_index}-{target_index}"),
+                        "subject-b",
+                        source_kind,
+                        source_id,
+                        target_kind,
+                        relationship,
+                    )
+                    .execute(&database.pool)
+                    .await;
+                    assert!(result.is_err(), "cross-subject {source_kind} must fail");
+                }
+            }
+
+            for target_kind in ["BeliefRevision", "ValueRevision"] {
+                let mut cross_target = EvidenceInsert::new(
+                    format!("cross-target-{target_kind}"),
+                    "subject-b",
+                    "Observation",
+                    "observation-b",
+                    target_kind,
+                    "Supports",
+                );
+                if target_kind == "BeliefRevision" {
+                    cross_target.target_belief_id = Some("belief-a".to_owned());
+                    cross_target.target_belief_revision_id = Some("belief-revision-a".to_owned());
+                } else {
+                    cross_target.target_value_id = Some("value-a".to_owned());
+                    cross_target.target_value_revision_id = Some("value-revision-a".to_owned());
+                }
+                assert!(cross_target.execute(&database.pool).await.is_err());
+            }
+
+            let semantic_count_before: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM evidence_links
+                 WHERE subject_id = 'subject-a'
+                   AND source_kind = 'Observation'
+                   AND source_observation_id = 'observation-a'
+                   AND relationship_kind = 'Supports'
+                   AND target_kind = 'BeliefRevision'
+                   AND target_belief_revision_id = 'belief-revision-a'
+                   AND provenance = 'UserAuthored'",
+            )
+            .fetch_one(&database.pool)
+            .await
+            .unwrap();
+            for id in ["duplicate-assertion-1", "duplicate-assertion-2"] {
+                EvidenceInsert::new(
+                    id,
+                    "subject-a",
+                    "Observation",
+                    "observation-a",
+                    "BeliefRevision",
+                    "Supports",
+                )
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            }
+            let semantic_count_after: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM evidence_links
+                 WHERE subject_id = 'subject-a'
+                   AND source_kind = 'Observation'
+                   AND source_observation_id = 'observation-a'
+                   AND relationship_kind = 'Supports'
+                   AND target_kind = 'BeliefRevision'
+                   AND target_belief_revision_id = 'belief-revision-a'
+                   AND provenance = 'UserAuthored'",
+            )
+            .fetch_one(&database.pool)
+            .await
+            .unwrap();
+            assert_eq!(semantic_count_after, semantic_count_before + 2);
+
+            let mut with_note = EvidenceInsert::new(
+                "valid-user-note",
+                "subject-a",
+                "Memory",
+                "memory-a",
+                "ValueRevision",
+                "Complicates",
+            );
+            with_note.user_note = Some("用户说明 with mixed Unicode 🌱".to_owned());
+            with_note.execute(&database.pool).await.unwrap();
+
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn fourth_migration_rejects_invalid_shapes_references_and_closed_values() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let base = EvidenceInsert::new(
+                "invalid-fixture",
+                "subject-a",
+                "Observation",
+                "observation-a",
+                "BeliefRevision",
+                "Supports",
+            );
+
+            let mut zero_sources = base.clone();
+            zero_sources.source_observation_id = None;
+            assert!(zero_sources.execute(&database.pool).await.is_err());
+
+            let mut multiple_sources = base.clone();
+            multiple_sources.source_thought_id = Some("thought-a".to_owned());
+            assert!(multiple_sources.execute(&database.pool).await.is_err());
+
+            let mut mismatched_source = base.clone();
+            mismatched_source.source_kind = "Thought".to_owned();
+            assert!(mismatched_source.execute(&database.pool).await.is_err());
+
+            let mut unknown_source = base.clone();
+            unknown_source.source_kind = "PersonReference".to_owned();
+            assert!(unknown_source.execute(&database.pool).await.is_err());
+
+            let mut missing_source = base.clone();
+            missing_source.source_observation_id = Some("missing-observation".to_owned());
+            assert!(missing_source.execute(&database.pool).await.is_err());
+
+            let mut no_target = base.clone();
+            no_target.target_belief_id = None;
+            no_target.target_belief_revision_id = None;
+            assert!(no_target.execute(&database.pool).await.is_err());
+
+            let mut both_targets = base.clone();
+            both_targets.target_value_id = Some("value-a".to_owned());
+            both_targets.target_value_revision_id = Some("value-revision-a".to_owned());
+            assert!(both_targets.execute(&database.pool).await.is_err());
+
+            let mut mismatched_target = base.clone();
+            mismatched_target.target_kind = "ValueRevision".to_owned();
+            assert!(mismatched_target.execute(&database.pool).await.is_err());
+
+            let mut anchor_only = base.clone();
+            anchor_only.target_belief_revision_id = None;
+            assert!(anchor_only.execute(&database.pool).await.is_err());
+
+            let mut revision_only = base.clone();
+            revision_only.target_belief_id = None;
+            assert!(revision_only.execute(&database.pool).await.is_err());
+
+            let mut unknown_target = base.clone();
+            unknown_target.target_kind = "Belief".to_owned();
+            assert!(unknown_target.execute(&database.pool).await.is_err());
+
+            let mut missing_anchor = base.clone();
+            missing_anchor.target_belief_id = Some("missing-belief".to_owned());
+            missing_anchor.target_belief_revision_id = Some("missing-revision".to_owned());
+            assert!(missing_anchor.execute(&database.pool).await.is_err());
+
+            let mut missing_revision = base.clone();
+            missing_revision.target_belief_revision_id = Some("missing-revision".to_owned());
+            assert!(missing_revision.execute(&database.pool).await.is_err());
+
+            let mut wrong_belief_anchor = base.clone();
+            wrong_belief_anchor.target_belief_id = Some("belief-a-other".to_owned());
+            assert!(wrong_belief_anchor.execute(&database.pool).await.is_err());
+
+            let mut wrong_value_anchor = EvidenceInsert::new(
+                "wrong-value-anchor",
+                "subject-a",
+                "Observation",
+                "observation-a",
+                "ValueRevision",
+                "Supports",
+            );
+            wrong_value_anchor.target_value_id = Some("value-a-other".to_owned());
+            assert!(wrong_value_anchor.execute(&database.pool).await.is_err());
+
+            let mut missing_value_anchor = EvidenceInsert::new(
+                "missing-value-anchor",
+                "subject-a",
+                "Observation",
+                "observation-a",
+                "ValueRevision",
+                "Supports",
+            );
+            missing_value_anchor.target_value_id = Some("missing-value".to_owned());
+            missing_value_anchor.target_value_revision_id = Some("missing-revision".to_owned());
+            assert!(missing_value_anchor.execute(&database.pool).await.is_err());
+
+            let mut missing_value_revision = EvidenceInsert::new(
+                "missing-value-revision",
+                "subject-a",
+                "Observation",
+                "observation-a",
+                "ValueRevision",
+                "Supports",
+            );
+            missing_value_revision.target_value_revision_id = Some("missing-revision".to_owned());
+            assert!(missing_value_revision
+                .execute(&database.pool)
+                .await
+                .is_err());
+
+            let mut unknown_relationship = base.clone();
+            unknown_relationship.relationship_kind = "Implies".to_owned();
+            assert!(unknown_relationship.execute(&database.pool).await.is_err());
+
+            let mut unknown_provenance = base.clone();
+            unknown_provenance.provenance = "SystemProposed".to_owned();
+            assert!(unknown_provenance.execute(&database.pool).await.is_err());
+
+            for (index, note) in ["", "   ", "\t\r\n"].iter().enumerate() {
+                let mut blank_note = base.clone();
+                blank_note.id = format!("blank-note-{index}");
+                blank_note.user_note = Some((*note).to_owned());
+                assert!(blank_note.execute(&database.pool).await.is_err());
+            }
+
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn fourth_migration_restricts_deletion_of_referenced_evidence_records() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            EvidenceInsert::new(
+                "restrict-belief-link",
+                "subject-a",
+                "Observation",
+                "observation-a",
+                "BeliefRevision",
+                "Supports",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            EvidenceInsert::new(
+                "restrict-value-link",
+                "subject-a",
+                "Memory",
+                "memory-a",
+                "ValueRevision",
+                "Contextualizes",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+
+            for (table, id) in [
+                ("observations", "observation-a"),
+                ("memories", "memory-a"),
+                ("belief_revisions", "belief-revision-a"),
+                ("value_revisions", "value-revision-a"),
+                ("beliefs", "belief-a"),
+                ("values", "value-a"),
+                ("self_subjects", "subject-a"),
+            ] {
+                let sql = format!("DELETE FROM \"{table}\" WHERE id = ?");
+                assert!(sqlx::query(&sql)
+                    .bind(id)
+                    .execute(&database.pool)
+                    .await
+                    .is_err());
+            }
+
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_repository_round_trips_every_source_both_targets_and_optional_unicode_notes() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let repository = repository(&database);
+            let links = [
+                evidence_link(
+                    "roundtrip-observation",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "roundtrip-thought",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Thought(
+                        crate::domain::ThoughtId::new("thought-a").unwrap(),
+                    ),
+                    value_evidence_target("value-a", "value-revision-a"),
+                    crate::domain::EvidenceRelationKind::Contradicts,
+                    Some("Explicit user-authored tension."),
+                ),
+                evidence_link(
+                    "roundtrip-emotion",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Emotion(
+                        crate::domain::EmotionId::new("emotion-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Contextualizes,
+                    Some("用户说明：这是感受背景。"),
+                ),
+                evidence_link(
+                    "roundtrip-situation",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Situation(
+                        crate::domain::SituationId::new("situation-a").unwrap(),
+                    ),
+                    value_evidence_target("value-a", "value-revision-a"),
+                    crate::domain::EvidenceRelationKind::Contextualizes,
+                    Some("Context 背景 🌱"),
+                ),
+                evidence_link(
+                    "roundtrip-memory",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Memory(
+                        crate::domain::MemoryId::new("memory-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Complicates,
+                    None,
+                ),
+                evidence_link(
+                    "roundtrip-decision",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Decision(
+                        crate::domain::DecisionId::new("decision-a").unwrap(),
+                    ),
+                    value_evidence_target("value-a", "value-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "roundtrip-outcome",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Outcome(
+                        crate::domain::OutcomeId::new("outcome-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Contradicts,
+                    None,
+                ),
+            ];
+
+            for (offset, link) in links.iter().enumerate() {
+                repository
+                    .create_evidence_link(link, 100 + i64::try_from(offset).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    repository.load_evidence_link(link.id()).await.unwrap(),
+                    *link
+                );
+            }
+
+            assert!(matches!(
+                repository
+                    .load_evidence_link(
+                        &crate::domain::EvidenceLinkId::new("missing-link").unwrap()
+                    )
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "EvidenceLink",
+                    ..
+                })
+            ));
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_repository_lists_exact_revisions_in_deterministic_storage_order() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            sqlx::raw_sql(
+                "INSERT INTO belief_revisions
+                    (id, belief_id, revision_number, proposition, endorsement, change_note, origin, created_at_ms)
+                 VALUES ('belief-revision-a-2', 'belief-a', 2, 'Belief A revised', NULL, NULL, 'UserUpdate', 29);
+                 INSERT INTO value_revisions
+                    (id, value_id, revision_number, label, importance, change_note, origin, created_at_ms)
+                 VALUES ('value-revision-a-2', 'value-a', 2, 'Value A revised', NULL, NULL, 'UserUpdate', 30);",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            let repository = repository(&database);
+
+            for (id, timestamp) in [
+                ("belief-order-z", 10),
+                ("belief-order-a", 10),
+                ("belief-order-m", 20),
+            ] {
+                let link = evidence_link(
+                    id,
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                );
+                repository
+                    .create_evidence_link(&link, timestamp)
+                    .await
+                    .unwrap();
+            }
+            let later_belief_link = evidence_link(
+                "belief-later-revision-only",
+                "subject-a",
+                crate::domain::EvidenceSource::Memory(
+                    crate::domain::MemoryId::new("memory-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a", "belief-revision-a-2"),
+                crate::domain::EvidenceRelationKind::Complicates,
+                None,
+            );
+            repository
+                .create_evidence_link(&later_belief_link, 5)
+                .await
+                .unwrap();
+
+            for (id, timestamp) in [("value-order-z", 30), ("value-order-a", 30)] {
+                let link = evidence_link(
+                    id,
+                    "subject-a",
+                    crate::domain::EvidenceSource::Decision(
+                        crate::domain::DecisionId::new("decision-a").unwrap(),
+                    ),
+                    value_evidence_target("value-a", "value-revision-a"),
+                    crate::domain::EvidenceRelationKind::Contextualizes,
+                    None,
+                );
+                repository
+                    .create_evidence_link(&link, timestamp)
+                    .await
+                    .unwrap();
+            }
+            let later_value_link = evidence_link(
+                "value-later-revision-only",
+                "subject-a",
+                crate::domain::EvidenceSource::Outcome(
+                    crate::domain::OutcomeId::new("outcome-a").unwrap(),
+                ),
+                value_evidence_target("value-a", "value-revision-a-2"),
+                crate::domain::EvidenceRelationKind::Supports,
+                None,
+            );
+            repository
+                .create_evidence_link(&later_value_link, 5)
+                .await
+                .unwrap();
+
+            let belief_links = repository
+                .load_evidence_links_for_belief_revision(
+                    &crate::domain::BeliefRevisionId::new("belief-revision-a").unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                belief_links
+                    .iter()
+                    .map(|link| link.id().as_str())
+                    .collect::<Vec<_>>(),
+                ["belief-order-a", "belief-order-z", "belief-order-m"]
+            );
+            assert_eq!(
+                repository
+                    .load_evidence_links_for_belief_revision(
+                        &crate::domain::BeliefRevisionId::new("belief-revision-a-2").unwrap(),
+                    )
+                    .await
+                    .unwrap(),
+                [later_belief_link]
+            );
+            assert!(repository
+                .load_evidence_links_for_belief_revision(
+                    &crate::domain::BeliefRevisionId::new("belief-revision-a-other").unwrap(),
+                )
+                .await
+                .unwrap()
+                .is_empty());
+
+            let value_links = repository
+                .load_evidence_links_for_value_revision(
+                    &crate::domain::ValueRevisionId::new("value-revision-a").unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                value_links
+                    .iter()
+                    .map(|link| link.id().as_str())
+                    .collect::<Vec<_>>(),
+                ["value-order-a", "value-order-z"]
+            );
+            assert_eq!(
+                repository
+                    .load_evidence_links_for_value_revision(
+                        &crate::domain::ValueRevisionId::new("value-revision-a-2").unwrap(),
+                    )
+                    .await
+                    .unwrap(),
+                [later_value_link]
+            );
+            assert!(repository
+                .load_evidence_links_for_value_revision(
+                    &crate::domain::ValueRevisionId::new("value-revision-a-other").unwrap(),
+                )
+                .await
+                .unwrap()
+                .is_empty());
+
+            assert!(matches!(
+                repository
+                    .load_evidence_links_for_belief_revision(
+                        &crate::domain::BeliefRevisionId::new("missing-belief-revision").unwrap(),
+                    )
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "BeliefRevision",
+                    ..
+                })
+            ));
+            assert!(matches!(
+                repository
+                    .load_evidence_links_for_value_revision(
+                        &crate::domain::ValueRevisionId::new("missing-value-revision").unwrap(),
+                    )
+                    .await,
+                Err(PersistenceError::NotFound {
+                    entity: "ValueRevision",
+                    ..
+                })
+            ));
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_repository_surfaces_constraints_and_allows_equivalent_assertions() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let repository = repository(&database);
+            let valid = evidence_link(
+                "repository-constraint-link",
+                "subject-a",
+                crate::domain::EvidenceSource::Observation(
+                    crate::domain::ObservationId::new("observation-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a", "belief-revision-a"),
+                crate::domain::EvidenceRelationKind::Supports,
+                Some("The same assertion may have another distinct record."),
+            );
+            repository.create_evidence_link(&valid, 1).await.unwrap();
+            assert!(matches!(
+                repository.create_evidence_link(&valid, 2).await,
+                Err(PersistenceError::ConstraintViolation {
+                    operation: "create_evidence_link",
+                    ..
+                })
+            ));
+
+            let equivalent = evidence_link(
+                "repository-equivalent-link",
+                "subject-a",
+                valid.source().clone(),
+                valid.target().clone(),
+                valid.relationship(),
+                valid.user_note(),
+            );
+            repository
+                .create_evidence_link(&equivalent, 2)
+                .await
+                .unwrap();
+
+            let invalid_links = [
+                evidence_link(
+                    "missing-source-link",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("missing-observation").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "cross-source-link",
+                    "subject-b",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-b", "belief-revision-b"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "cross-target-link",
+                    "subject-b",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-b").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "missing-target-link",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("missing-belief", "missing-belief-revision"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "missing-revision-link",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "missing-belief-revision"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+                evidence_link(
+                    "mismatched-anchor-link",
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a-other", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                ),
+            ];
+            for link in invalid_links {
+                assert!(matches!(
+                    repository.create_evidence_link(&link, 3).await,
+                    Err(PersistenceError::ConstraintViolation {
+                        operation: "create_evidence_link",
+                        ..
+                    })
+                ));
+            }
+
+            let links = repository
+                .load_evidence_links_for_belief_revision(
+                    &crate::domain::BeliefRevisionId::new("belief-revision-a").unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(links, [valid, equivalent]);
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_repository_rejects_operation_connections_with_foreign_keys_disabled() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let mut first = database.pool.acquire().await.unwrap();
+            let mut second = database.pool.acquire().await.unwrap();
+            for connection in [&mut first, &mut second] {
+                sqlx::query("PRAGMA foreign_keys = OFF")
+                    .execute(&mut **connection)
+                    .await
+                    .unwrap();
+            }
+            drop(first);
+            drop(second);
+
+            let repository = repository(&database);
+            let link = evidence_link(
+                "fk-disabled-evidence",
+                "subject-a",
+                crate::domain::EvidenceSource::Observation(
+                    crate::domain::ObservationId::new("observation-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a", "belief-revision-a"),
+                crate::domain::EvidenceRelationKind::Supports,
+                None,
+            );
+            assert!(matches!(
+                repository.create_evidence_link(&link, 1).await,
+                Err(PersistenceError::NotReady(_))
+            ));
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_repository_rejects_every_representative_corrupt_stored_field() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let repository = repository(&database);
+
+            let corrupt_ids = [
+                "corrupt-subject",
+                "corrupt-source-kind",
+                "corrupt-source-id",
+                "corrupt-source-shape",
+                "corrupt-target-kind",
+                "corrupt-belief-id",
+                "corrupt-belief-revision-id",
+                "corrupt-relationship",
+                "corrupt-provenance",
+                "corrupt-note",
+            ];
+            for id in corrupt_ids {
+                let link = evidence_link(
+                    id,
+                    "subject-a",
+                    crate::domain::EvidenceSource::Observation(
+                        crate::domain::ObservationId::new("observation-a").unwrap(),
+                    ),
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                    crate::domain::EvidenceRelationKind::Supports,
+                    None,
+                );
+                repository.create_evidence_link(&link, 10).await.unwrap();
+            }
+            for id in ["corrupt-value-id", "corrupt-value-revision-id"] {
+                let link = evidence_link(
+                    id,
+                    "subject-a",
+                    crate::domain::EvidenceSource::Thought(
+                        crate::domain::ThoughtId::new("thought-a").unwrap(),
+                    ),
+                    value_evidence_target("value-a", "value-revision-a"),
+                    crate::domain::EvidenceRelationKind::Complicates,
+                    None,
+                );
+                repository.create_evidence_link(&link, 10).await.unwrap();
+            }
+            let illegal_triplet = evidence_link(
+                "corrupt-illegal-triplet",
+                "subject-a",
+                crate::domain::EvidenceSource::Situation(
+                    crate::domain::SituationId::new("situation-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a", "belief-revision-a"),
+                crate::domain::EvidenceRelationKind::Contextualizes,
+                None,
+            );
+            repository
+                .create_evidence_link(&illegal_triplet, 10)
+                .await
+                .unwrap();
+            let invalid_id = evidence_link(
+                "corrupt-id-before",
+                "subject-a",
+                crate::domain::EvidenceSource::Observation(
+                    crate::domain::ObservationId::new("observation-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a-other", "belief-revision-a-other"),
+                crate::domain::EvidenceRelationKind::Supports,
+                None,
+            );
+            repository
+                .create_evidence_link(&invalid_id, 10)
+                .await
+                .unwrap();
+
+            apply_test_only_evidence_corruption(
+                &database.pool,
+                "UPDATE evidence_links SET subject_id = ' ' WHERE id = 'corrupt-subject';
+                 UPDATE evidence_links SET source_kind = 'PersonReference' WHERE id = 'corrupt-source-kind';
+                 UPDATE evidence_links SET source_observation_id = ' ' WHERE id = 'corrupt-source-id';
+                 UPDATE evidence_links SET source_kind = 'Thought' WHERE id = 'corrupt-source-shape';
+                 UPDATE evidence_links SET target_kind = 'Belief' WHERE id = 'corrupt-target-kind';
+                 UPDATE evidence_links SET target_belief_id = ' ' WHERE id = 'corrupt-belief-id';
+                 UPDATE evidence_links SET target_belief_revision_id = ' ' WHERE id = 'corrupt-belief-revision-id';
+                 UPDATE evidence_links SET target_value_id = ' ' WHERE id = 'corrupt-value-id';
+                 UPDATE evidence_links SET target_value_revision_id = ' ' WHERE id = 'corrupt-value-revision-id';
+                 UPDATE evidence_links SET relationship_kind = 'Implies' WHERE id = 'corrupt-relationship';
+                 UPDATE evidence_links SET provenance = 'SystemProposed' WHERE id = 'corrupt-provenance';
+                 UPDATE evidence_links SET user_note = ' ' WHERE id = 'corrupt-note';
+                 UPDATE evidence_links SET relationship_kind = 'Supports' WHERE id = 'corrupt-illegal-triplet';
+                 UPDATE evidence_links SET id = ' ' WHERE id = 'corrupt-id-before';",
+            )
+            .await;
+
+            for id in corrupt_ids.into_iter().chain([
+                "corrupt-value-id",
+                "corrupt-value-revision-id",
+                "corrupt-illegal-triplet",
+            ]) {
+                assert_domain_reconstruction(
+                    repository
+                        .load_evidence_link(&crate::domain::EvidenceLinkId::new(id).unwrap())
+                        .await,
+                );
+            }
+            assert_domain_reconstruction(
+                repository
+                    .load_evidence_links_for_belief_revision(
+                        &crate::domain::BeliefRevisionId::new("belief-revision-a-other").unwrap(),
+                    )
+                    .await,
+            );
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_repository_collection_loads_fail_when_any_row_is_corrupt() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let repository = repository(&database);
+
+            for (id, target) in [
+                (
+                    "belief-collection-valid",
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                ),
+                (
+                    "belief-collection-corrupt",
+                    belief_evidence_target("belief-a", "belief-revision-a"),
+                ),
+                (
+                    "value-collection-valid",
+                    value_evidence_target("value-a", "value-revision-a"),
+                ),
+                (
+                    "value-collection-corrupt",
+                    value_evidence_target("value-a", "value-revision-a"),
+                ),
+            ] {
+                let link = evidence_link(
+                    id,
+                    "subject-a",
+                    crate::domain::EvidenceSource::Memory(
+                        crate::domain::MemoryId::new("memory-a").unwrap(),
+                    ),
+                    target,
+                    crate::domain::EvidenceRelationKind::Contextualizes,
+                    Some("Valid before controlled corruption"),
+                );
+                repository.create_evidence_link(&link, 10).await.unwrap();
+            }
+            apply_test_only_evidence_corruption(
+                &database.pool,
+                "UPDATE evidence_links SET user_note = ' ' WHERE id = 'belief-collection-corrupt';
+                 UPDATE evidence_links SET provenance = 'SystemInferred' WHERE id = 'value-collection-corrupt';",
+            )
+            .await;
+
+            assert_domain_reconstruction(
+                repository
+                    .load_evidence_links_for_belief_revision(
+                        &crate::domain::BeliefRevisionId::new("belief-revision-a").unwrap(),
+                    )
+                    .await,
+            );
+            assert_domain_reconstruction(
+                repository
+                    .load_evidence_links_for_value_revision(
+                        &crate::domain::ValueRevisionId::new("value-revision-a").unwrap(),
+                    )
+                    .await,
+            );
+
+            drop(repository);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn evidence_links_and_exact_revision_lists_survive_close_and_reopen() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            seed_evidence_records(&database.pool).await;
+            let repository_before_reopen = repository(&database);
+
+            let belief_revision_two = repository_before_reopen
+                .append_belief_revision(
+                    &crate::domain::BeliefId::new("belief-a").unwrap(),
+                    AppendBeliefRevisionInput::new(
+                        crate::domain::BeliefRevisionId::new("belief-revision-a-2").unwrap(),
+                        "Belief A revised",
+                        None,
+                        None,
+                        crate::domain::RevisionOrigin::UserUpdate,
+                    ),
+                    40,
+                )
+                .await
+                .unwrap();
+            let value_revision_two = repository_before_reopen
+                .append_value_revision(
+                    &crate::domain::ValueId::new("value-a").unwrap(),
+                    AppendValueRevisionInput::new(
+                        crate::domain::ValueRevisionId::new("value-revision-a-2").unwrap(),
+                        "Value A revised",
+                        None,
+                        None,
+                        crate::domain::RevisionOrigin::UserUpdate,
+                    ),
+                    41,
+                )
+                .await
+                .unwrap();
+
+            let duplicate_a = evidence_link(
+                "durable-duplicate-a",
+                "subject-a",
+                crate::domain::EvidenceSource::Observation(
+                    crate::domain::ObservationId::new("observation-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a", "belief-revision-a"),
+                crate::domain::EvidenceRelationKind::Supports,
+                None,
+            );
+            let duplicate_z = evidence_link(
+                "durable-duplicate-z",
+                "subject-a",
+                duplicate_a.source().clone(),
+                duplicate_a.target().clone(),
+                duplicate_a.relationship(),
+                duplicate_a.user_note(),
+            );
+            let unicode_note = "用户说明：Memory complicates this belief — 保留原文 🌱";
+            let belief_context = evidence_link(
+                "durable-memory-m",
+                "subject-a",
+                crate::domain::EvidenceSource::Memory(
+                    crate::domain::MemoryId::new("memory-a").unwrap(),
+                ),
+                belief_evidence_target("belief-a", "belief-revision-a"),
+                crate::domain::EvidenceRelationKind::Complicates,
+                Some(unicode_note),
+            );
+            let value_link = evidence_link(
+                "durable-value-link",
+                "subject-a",
+                crate::domain::EvidenceSource::Decision(
+                    crate::domain::DecisionId::new("decision-a").unwrap(),
+                ),
+                value_evidence_target("value-a", "value-revision-a"),
+                crate::domain::EvidenceRelationKind::Contradicts,
+                Some("A deliberate choice was in tension with this priority."),
+            );
+
+            for (link, created_at_ms) in [
+                (&duplicate_z, 50),
+                (&duplicate_a, 50),
+                (&belief_context, 60),
+                (&value_link, 45),
+            ] {
+                repository_before_reopen
+                    .create_evidence_link(link, created_at_ms)
+                    .await
+                    .unwrap();
+            }
+            drop(repository_before_reopen);
+
+            let database = database.reopen().await;
+            let reopened_repository = repository(&database);
+
+            for expected in [&duplicate_a, &duplicate_z, &belief_context, &value_link] {
+                assert_eq!(
+                    reopened_repository
+                        .load_evidence_link(expected.id())
+                        .await
+                        .unwrap(),
+                    *expected
+                );
+            }
+            assert_eq!(duplicate_a.user_note(), None);
+            assert_eq!(
+                reopened_repository
+                    .load_evidence_link(belief_context.id())
+                    .await
+                    .unwrap()
+                    .user_note(),
+                Some(unicode_note)
+            );
+
+            let belief_links = reopened_repository
+                .load_evidence_links_for_belief_revision(
+                    &crate::domain::BeliefRevisionId::new("belief-revision-a").unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                belief_links
+                    .iter()
+                    .map(|link| link.id().as_str())
+                    .collect::<Vec<_>>(),
+                [
+                    "durable-duplicate-a",
+                    "durable-duplicate-z",
+                    "durable-memory-m"
+                ]
+            );
+            assert!(reopened_repository
+                .load_evidence_links_for_belief_revision(belief_revision_two.id())
+                .await
+                .unwrap()
+                .is_empty());
+            assert_eq!(
+                reopened_repository
+                    .load_evidence_links_for_value_revision(
+                        &crate::domain::ValueRevisionId::new("value-revision-a").unwrap(),
+                    )
+                    .await
+                    .unwrap(),
+                [value_link]
+            );
+            assert!(reopened_repository
+                .load_evidence_links_for_value_revision(value_revision_two.id())
+                .await
+                .unwrap()
+                .is_empty());
+
+            drop(reopened_repository);
             database.close().await;
         });
     }
