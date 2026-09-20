@@ -26,6 +26,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0003_create_lived_experience_records.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "create_evidence_links",
+            sql: include_str!("../migrations/0004_create_evidence_links.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -54,7 +60,7 @@ mod tests {
     fn contains_the_registered_task_migrations() {
         let migrations = migrations();
 
-        assert_eq!(migrations.len(), 3);
+        assert_eq!(migrations.len(), 4);
         assert_eq!(migrations[0].version, 1);
         assert_eq!(migrations[0].description, "initialize_local_storage");
         assert!(migrations[0].sql.contains("app_metadata"));
@@ -66,5 +72,8 @@ mod tests {
         assert!(migrations[2].sql.contains("CREATE TABLE memories"));
         assert!(migrations[2].sql.contains("CREATE TABLE decisions"));
         assert!(migrations[2].sql.contains("CREATE TABLE outcomes"));
+        assert_eq!(migrations[3].version, 4);
+        assert_eq!(migrations[3].description, "create_evidence_links");
+        assert!(migrations[3].sql.contains("CREATE TABLE evidence_links"));
     }
 }

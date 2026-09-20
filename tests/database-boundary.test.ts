@@ -31,13 +31,13 @@ describe("frontend database security boundary", () => {
 
     expect(source).not.toContain("@tauri-apps/plugin-sql");
     expect(source).not.toMatch(
-      /\b(?:SELECT|INSERT|UPDATE|DELETE)\b[\s\S]*(?:app_metadata|self_subjects|person_references|situations|observations|thoughts|emotions|beliefs|belief_revisions|value_revisions|memories|decisions|outcomes)/i,
+      /\b(?:SELECT|INSERT|UPDATE|DELETE)\b[\s\S]*(?:app_metadata|self_subjects|person_references|situations|observations|thoughts|emotions|beliefs|belief_revisions|value_revisions|memories|decisions|outcomes|evidence_links)/i,
     );
     expect(databaseSource).toContain(
       'invoke<DatabaseStatusResponse>("database_status")',
     );
     expect(databaseSource).not.toMatch(/invoke[^;]*,\s*\{/);
-    expect(databaseSource).toContain("status.schemaVersion !== 3");
+    expect(databaseSource).toContain("status.schemaVersion !== 4");
   });
 
   it("grants the frontend no SQL load, select, or execute capability", () => {

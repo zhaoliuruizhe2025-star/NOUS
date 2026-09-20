@@ -53,6 +53,7 @@ define_id!(EmotionId, "emotion_id");
 define_id!(MemoryId, "memory_id");
 define_id!(DecisionId, "decision_id");
 define_id!(OutcomeId, "outcome_id");
+define_id!(EvidenceLinkId, "evidence_link_id");
 define_id!(BeliefId, "belief_id");
 define_id!(BeliefRevisionId, "belief_revision_id");
 define_id!(ValueId, "value_id");
