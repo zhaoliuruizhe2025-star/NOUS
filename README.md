@@ -23,7 +23,7 @@ NOUS is designed around five long-term capabilities:
 1. **Mind Mirror** — show how the user's thinking, values, and recurring interpretations change over time.
 2. **Inner Map / Belief Graph** — represent important beliefs, values, and their relationships.
 3. **Philosophy Engine** — surface tensions and alternative interpretations without declaring one worldview correct.
-4. **Life Paths** — explore trade-offs among possible choices without recommending a choice.
+4. **Life Paths** — explore trade-offs among possible choices and offer requested, grounded directional advice while leaving final decision authority with the user.
 5. **Digital Self** — experimentally test how well an explicit self-model can anticipate responses to new situations.
 
 A cross-cutting **Care Layer** takes priority whenever analysis would be inappropriate or potentially harmful.
@@ -41,7 +41,7 @@ NOUS should be useful before it tries to be insightful. Where appropriate, respo
 - Local-first and privacy-first.
 - No external LLM or AI API is required for core functionality.
 - User-facing conclusions must be explainable.
-- NOUS describes and reflects; it does not prescribe life decisions.
+- NOUS describes, reflects, and may provide requested, grounded recommendations; the user retains final decision authority. Advice follows `docs/PRINCIPLES.md` §13.1.
 - Historical self-model data is preserved rather than silently overwritten.
 - Care takes priority over analysis when a user appears to be in significant distress.
 - The UI supports English and Simplified Chinese.

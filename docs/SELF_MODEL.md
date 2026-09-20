@@ -146,11 +146,17 @@ Examples:
 
 A Thought is not automatically an objective fact and is not necessarily a stable Belief.
 
+`ThoughtConfidence` is optional and means **the user's subjective conviction in that Thought at that time**. For example, a value of `80` for “He is intentionally ignoring me” means the user reported roughly 80/100 conviction then. It is not NOUS's confidence in interpreting the user, an objective probability that the thought is true, a calculated psychological score, or a probability of another person's motive.
+
+A numeric value may be used only when the user explicitly provides or selects that degree of conviction. NOUS must not automatically invent or calculate it from ordinary language, including qualitative expressions of certainty. Normal conversation must not repeatedly ask for 0–100 ratings; a limited, skippable calibration question may ask about subjective conviction when genuinely useful. Thoughts do not require this field.
+
+This owner-approved Round 2 clarification defines the field's meaning for future capture work; it does not authorize reinterpretation of existing stored values, changes to the scale or persistence, or a scoring/system-confidence mechanism.
+
 Suggested fields:
 - id
 - content
 - timestamp
-- confidence
+- confidence (optional user-reported subjective conviction)
 - relatedSituation
 - relatedEmotions
 - relatedBeliefs

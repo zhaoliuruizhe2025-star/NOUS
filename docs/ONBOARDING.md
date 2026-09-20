@@ -4,7 +4,9 @@
 
 This document records the approved future product design for first-run onboarding. It authorizes neither UI nor model implementation.
 
-NOUS should become useful before months of accumulated history exist. A short mandatory conversational onboarding creates a **Bootstrap Self Model**: enough provisional context to personalize early help without claiming complete understanding.
+NOUS should become useful before months of accumulated history exist. A short guided conversational onboarding may build a **Bootstrap Self Model**: provisional context to personalize early help without claiming complete understanding.
+
+All onboarding questions are skippable, sensitive disclosure must never be forced, and the user may continue with limited initial context. NOUS may explain how concrete situations, thoughts, decisions, later outcomes, Values, and relevant history can improve understanding, but must not imply that completing a psychological questionnaire is required for it to work. Normal natural interaction can continue building understanding over time.
 
 ## 2. Experience
 
@@ -28,7 +30,7 @@ Bootstrap Model -> Accumulating Model -> Evidence-backed Self Model
 
 NOUS can begin understanding a person on day one, but must not pretend to have understood them completely on day one. It may use the model immediately, while keeping it easy to revise as lived evidence accumulates. Do not invent numeric psychological precision or issue a first-run personality report.
 
-After onboarding, a restrained acknowledgement such as “I’m starting to get to know you” is enough; enter the normal conversation rather than presenting a profile, scorecard, or “You are the kind of person who…” summary. The model should reveal itself through usefulness, not through labels.
+After onboarding, or when the user chooses to skip it, enter the normal conversation rather than presenting a profile, scorecard, or “You are the kind of person who…” summary. When context has been shared, a restrained acknowledgement such as “I’m starting to get to know you” is enough. The model should reveal itself through usefulness, not through labels.
 
 ## 4. Visibility and correction
 
