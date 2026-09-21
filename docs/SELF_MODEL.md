@@ -34,6 +34,8 @@ For a reported experience, retain separate fields or provenance for:
 
 A statement such as “My teacher is deliberately targeting me” is initially a Thought/interpretation, not an Observation. A system-considered emotion or mechanism remains a tentative system interpretation unless the user reports or confirms it.
 
+When these records become reasoning premises, apply the epistemic distinctions in [REASONING_MODEL.md](REASONING_MODEL.md). Their type, provenance, context, and time constrain conclusions; storage or a confirmed wording does not establish objective truth. Model validation does not authorize automatic persistence or promotion into canonical knowledge.
+
 ## 2. Modeling subject and third-party boundary
 
 ### 2.1 SelfSubject
@@ -399,6 +401,8 @@ Outcome ──────→ Memory / Evidence
 
 This is not claimed to be a complete psychological theory. It is a practical computational model.
 
+The arrows describe possible conceptual relationships, not proven causal steps, automatic promotions, or permission to persist. Their use in an actual conclusion must satisfy [REASONING_MODEL.md](REASONING_MODEL.md).
+
 ## 7. Temporal model
 
 A person's current state must not erase their past state.
@@ -431,6 +435,8 @@ Derived patterns must store:
 - uncertainty.
 
 Derived patterns must remain provisional and must not turn weak or isolated material into deterministic labels. A strong, relevant pattern may inform a light reminder or hypothesis, but it never overrides the user's correction or agency.
+
+Future Pattern/Candidate/Hypothesis interpretations must satisfy the Model Validation, counterevidence, context scope, temporal validity, and conclusion-strength requirements in [REASONING_MODEL.md](REASONING_MODEL.md). Provisional means revisable; it does not require permanent tentative wording when evidence supports a clear conclusion. These conceptual validation dimensions define no new entity, table, or numeric confidence scale.
 
 ## 9. User correction
 

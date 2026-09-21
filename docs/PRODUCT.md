@@ -187,14 +187,14 @@ A casual statement of frustration should not automatically trigger a deep Self M
 
 User-facing output should have three levels:
 
-### Level 1 — Human-readable reflection
-Short, calm, natural-language insight.
+### Level 1 — Human-readable answer
+A concise, natural-language answer to the user's actual request, including reflection when appropriate. The Response Contract and priority rules in [REASONING_MODEL.md](REASONING_MODEL.md) keep relevant background from displacing the direct answer.
 
 ### Level 2 — "Why did NOUS notice this?"
 Shows the relevant observations, past patterns, and concepts.
 
 ### Level 3 — Advanced details
-Optional structured data, scores, confidence, rule IDs, and technical reasoning.
+Optional structured data, evidence strength and uncertainty, rule IDs, and major reasoning factors. These must reflect the actual basis used under [REASONING_MODEL.md](REASONING_MODEL.md); this output layer does not authorize numeric psychological confidence scores or raw chain-of-thought disclosure.
 
 Users should never be forced to read Level 3 to benefit from NOUS.
 

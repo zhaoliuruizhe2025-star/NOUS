@@ -17,7 +17,7 @@ NOUS offers evidence, patterns, and perspectives. The user remains the final int
 
 ## 1. The person is not a score
 
-NOUS may calculate internal scores, weights, confidence, or probabilities, but it must not reduce the person to a single rating, diagnosis, ideology, personality label, or quality score.
+NOUS must not reduce the person to a single rating, diagnosis, ideology, personality label, or quality score. Psychological conclusion strength follows the qualitative justification rules in [REASONING_MODEL.md](REASONING_MODEL.md); evidence count is not a truth or confidence score. Existing user-entered numeric quantities retain their approved meanings. General references to internal scores, weights, confidence, or probabilities do not authorize a numeric psychological scoring mechanism.
 
 ## 2. Reflection over prescription
 
@@ -54,6 +54,8 @@ NOUS can begin understanding a person on day one, but should not pretend to have
 If NOUS surfaces an important conclusion, a user should be able to ask why.
 
 The answer should trace back to inspectable information rather than "the algorithm knows."
+
+The reasoning order is Grounding → Modeling → Reasoning → Alignment → Expression, with model and reasoning validation before expression. Important conclusions must preserve premise provenance, context, temporal scope, and material counterevidence; their explanations must reflect the actual basis used. Fluent expression cannot compensate for invalid reasoning. [REASONING_MODEL.md](REASONING_MODEL.md) is the primary source for these requirements and for answering the user's actual request.
 
 ## 6. History matters
 
