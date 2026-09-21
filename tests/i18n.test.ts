@@ -11,6 +11,14 @@ describe("localization", () => {
     expect(supportedLocales).toEqual(["en", "zh-CN"]);
     expect(getMessages("en").placeholderTitle).toContain("perspective");
     expect(getMessages("zh-CN").placeholderTitle).toContain("自己");
+    expect(getMessages("en").capture.enterReview).toBe("Review what to remember");
+    expect(getMessages("zh-CN").capture.enterReview).toBe("整理要记住的内容");
+    expect(Object.keys(getMessages("zh-CN").capture)).toEqual(
+      Object.keys(getMessages("en").capture),
+    );
+    expect(Object.keys(getMessages("zh-CN").capture.errors)).toEqual(
+      Object.keys(getMessages("en").capture.errors),
+    );
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {
@@ -23,4 +31,3 @@ describe("localization", () => {
     expect(resolveInitialLocale()).toBe("en");
   });
 });
-

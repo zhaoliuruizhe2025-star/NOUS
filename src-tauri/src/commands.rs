@@ -1,7 +1,16 @@
-use serde::Serialize;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::persistence::SharedSqlitePool;
+use crate::{
+    application::{
+        save_structured_capture as save_structured_capture_workflow, ObservationCaptureInput,
+        SaveStructuredCaptureInput, SavedStructuredCapture, SituationCaptureInput,
+        StructuredCaptureError, ThoughtCaptureInput,
+    },
+    persistence::{PersistenceError, SharedSqlitePool, SqliteSelfModelRepository},
+};
 
 const EXPECTED_SCHEMA_VERSION: &str = "4";
 const READINESS_ERROR: &str = "Local database readiness verification failed.";
@@ -12,6 +21,74 @@ pub(crate) struct DatabaseStatus {
     schema_version: u32,
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SituationCaptureRequest {
+    id: String,
+    description: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ObservationCaptureRequest {
+    id: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ThoughtCaptureRequest {
+    id: String,
+    content: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct SaveStructuredCaptureRequest {
+    situation: Option<SituationCaptureRequest>,
+    observations: Vec<ObservationCaptureRequest>,
+    thoughts: Vec<ThoughtCaptureRequest>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SituationCaptureResponse {
+    id: String,
+    description: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ObservationCaptureResponse {
+    id: String,
+    situation_id: Option<String>,
+    content: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ThoughtCaptureResponse {
+    id: String,
+    situation_id: Option<String>,
+    content: String,
+    confidence: Option<u8>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SavedStructuredCaptureResponse {
+    situation: Option<SituationCaptureResponse>,
+    observations: Vec<ObservationCaptureResponse>,
+    thoughts: Vec<ThoughtCaptureResponse>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredCaptureCommandError {
+    code: &'static str,
+    item_index: Option<usize>,
+}
+
 /// Reports readiness for the one database managed and migrated by the SQL plugin.
 ///
 /// The command deliberately accepts no caller-selected SQL, table, path, or operation.
@@ -20,6 +97,116 @@ pub(crate) async fn database_status(
     database: State<'_, SharedSqlitePool>,
 ) -> Result<DatabaseStatus, &'static str> {
     database_status_for_pool(&database).await
+}
+
+#[tauri::command]
+pub(crate) async fn save_structured_capture(
+    database: State<'_, SharedSqlitePool>,
+    request: SaveStructuredCaptureRequest,
+) -> Result<SavedStructuredCaptureResponse, StructuredCaptureCommandError> {
+    let created_at_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .ok_or_else(|| command_error("clockUnavailable", None))?;
+
+    save_structured_capture_for_pool(&database, request, created_at_ms).await
+}
+
+async fn save_structured_capture_for_pool(
+    database: &SharedSqlitePool,
+    request: SaveStructuredCaptureRequest,
+    created_at_ms: i64,
+) -> Result<SavedStructuredCaptureResponse, StructuredCaptureCommandError> {
+    let repository = SqliteSelfModelRepository::new(database.clone());
+    let saved = save_structured_capture_workflow(&repository, request.into(), created_at_ms)
+        .await
+        .map_err(map_capture_error)?;
+    Ok(saved.into())
+}
+
+fn command_error(code: &'static str, item_index: Option<usize>) -> StructuredCaptureCommandError {
+    StructuredCaptureCommandError { code, item_index }
+}
+
+fn map_capture_error(error: StructuredCaptureError) -> StructuredCaptureCommandError {
+    match error {
+        StructuredCaptureError::EmptyCapture => command_error("emptyCapture", None),
+        StructuredCaptureError::InvalidSituation(_) => command_error("invalidSituation", None),
+        StructuredCaptureError::InvalidObservation { index, .. } => {
+            command_error("invalidObservation", Some(index))
+        }
+        StructuredCaptureError::InvalidThought { index, .. } => {
+            command_error("invalidThought", Some(index))
+        }
+        StructuredCaptureError::Persistence(PersistenceError::SubjectInvariant(_)) => {
+            command_error("subjectInvariant", None)
+        }
+        StructuredCaptureError::Persistence(PersistenceError::ConstraintViolation { .. }) => {
+            command_error("captureConflict", None)
+        }
+        StructuredCaptureError::Persistence(PersistenceError::NotReady(_)) => {
+            command_error("storageUnavailable", None)
+        }
+        StructuredCaptureError::Persistence(_) => command_error("saveFailed", None),
+    }
+}
+
+impl From<SaveStructuredCaptureRequest> for SaveStructuredCaptureInput {
+    fn from(request: SaveStructuredCaptureRequest) -> Self {
+        Self {
+            situation: request.situation.map(|situation| SituationCaptureInput {
+                id: situation.id,
+                description: situation.description,
+            }),
+            observations: request
+                .observations
+                .into_iter()
+                .map(|observation| ObservationCaptureInput {
+                    id: observation.id,
+                    content: observation.content,
+                })
+                .collect(),
+            thoughts: request
+                .thoughts
+                .into_iter()
+                .map(|thought| ThoughtCaptureInput {
+                    id: thought.id,
+                    content: thought.content,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<SavedStructuredCapture> for SavedStructuredCaptureResponse {
+    fn from(saved: SavedStructuredCapture) -> Self {
+        Self {
+            situation: saved.situation.map(|situation| SituationCaptureResponse {
+                id: situation.id().as_str().to_owned(),
+                description: situation.description().to_owned(),
+            }),
+            observations: saved
+                .observations
+                .into_iter()
+                .map(|observation| ObservationCaptureResponse {
+                    id: observation.id().as_str().to_owned(),
+                    situation_id: observation.situation_id().map(|id| id.as_str().to_owned()),
+                    content: observation.content().to_owned(),
+                })
+                .collect(),
+            thoughts: saved
+                .thoughts
+                .into_iter()
+                .map(|thought| ThoughtCaptureResponse {
+                    id: thought.id().as_str().to_owned(),
+                    situation_id: thought.situation_id().map(|id| id.as_str().to_owned()),
+                    content: thought.content().to_owned(),
+                    confidence: thought.confidence().map(|value| value.value()),
+                })
+                .collect(),
+        }
+    }
 }
 
 async fn database_status_for_pool(
@@ -50,9 +237,10 @@ fn status_for_schema_version(schema_version: Option<&str>) -> Result<DatabaseSta
 #[cfg(test)]
 mod tests {
     use super::{
-        database_status_for_pool, status_for_schema_version, DatabaseStatus, READINESS_ERROR,
+        database_status_for_pool, map_capture_error, status_for_schema_version, DatabaseStatus,
+        SaveStructuredCaptureRequest, StructuredCaptureError, READINESS_ERROR,
     };
-    use crate::persistence::SharedSqlitePool;
+    use crate::persistence::{PersistenceError, SharedSqlitePool};
     use sqlx::sqlite::SqlitePoolOptions;
 
     #[test]
@@ -74,6 +262,49 @@ mod tests {
                 .expect("database status should serialize"),
             serde_json::json!({ "schemaVersion": 4 })
         );
+    }
+
+    #[test]
+    fn structured_capture_request_is_strict_and_has_no_inference_or_authority_fields() {
+        let valid = serde_json::json!({
+            "situation": { "id": "situation-1", "description": "A meeting" },
+            "observations": [{ "id": "observation-1", "content": "The meeting ended." }],
+            "thoughts": [{ "id": "thought-1", "content": "They may not trust me." }]
+        });
+        assert!(serde_json::from_value::<SaveStructuredCaptureRequest>(valid.clone()).is_ok());
+
+        for (field, value) in [
+            ("subjectId", serde_json::json!("other-subject")),
+            ("situationId", serde_json::json!("older-situation")),
+            ("rawInput", serde_json::json!("temporary conversation text")),
+            ("persistenceIntent", serde_json::json!("explicitSave")),
+            ("confidence", serde_json::json!(90)),
+        ] {
+            let mut invalid = valid.clone();
+            invalid.as_object_mut().unwrap().insert(field.into(), value);
+            assert!(
+                serde_json::from_value::<SaveStructuredCaptureRequest>(invalid).is_err(),
+                "unexpectedly accepted {field}"
+            );
+        }
+
+        let mut thought_confidence = valid;
+        thought_confidence["thoughts"][0]["confidence"] = serde_json::json!(80);
+        assert!(
+            serde_json::from_value::<SaveStructuredCaptureRequest>(thought_confidence).is_err()
+        );
+    }
+
+    #[test]
+    fn structured_capture_errors_expose_only_safe_codes() {
+        let error = map_capture_error(StructuredCaptureError::Persistence(
+            PersistenceError::Storage("SQL INSERT failed with secret details".into()),
+        ));
+        let serialized = serde_json::to_string(&error).unwrap();
+
+        assert_eq!(serialized, r#"{"code":"saveFailed","itemIndex":null}"#);
+        assert!(!serialized.contains("SQL"));
+        assert!(!serialized.contains("secret"));
     }
 
     #[test]

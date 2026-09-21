@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { LanguageSelector } from "../components/LanguageSelector";
+import { StructuredCapture } from "../components/StructuredCapture";
 import {
   getMessages,
   resolveInitialLocale,
@@ -50,16 +51,22 @@ export function App() {
         />
       </header>
 
-      <section className="landing" aria-labelledby="landing-title">
-        <p className="eyebrow">{messages.loop}</p>
-        <h1 id="landing-title">{messages.placeholderTitle}</h1>
-        <p className="placeholder-copy">{messages.placeholderBody}</p>
-        <p className={`database-status database-status--${databaseStatus}`} role="status">
-          <span aria-hidden="true" />
-          {messages.database[databaseStatus]}
-        </p>
-      </section>
+      {databaseStatus === "ready" ? (
+        <StructuredCapture messages={messages} />
+      ) : (
+        <section className="landing" aria-labelledby="landing-title">
+          <p className="eyebrow">{messages.loop}</p>
+          <h1 id="landing-title">{messages.placeholderTitle}</h1>
+          <p className="placeholder-copy">{messages.placeholderBody}</p>
+          <p
+            className={`database-status database-status--${databaseStatus}`}
+            role="status"
+          >
+            <span aria-hidden="true" />
+            {messages.database[databaseStatus]}
+          </p>
+        </section>
+      )}
     </main>
   );
 }
-

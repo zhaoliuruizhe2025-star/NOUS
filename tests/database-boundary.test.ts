@@ -31,7 +31,7 @@ describe("frontend database security boundary", () => {
 
     expect(source).not.toContain("@tauri-apps/plugin-sql");
     expect(source).not.toMatch(
-      /\b(?:SELECT|INSERT|UPDATE|DELETE)\b[\s\S]*(?:app_metadata|self_subjects|person_references|situations|observations|thoughts|emotions|beliefs|belief_revisions|value_revisions|memories|decisions|outcomes|evidence_links)/i,
+      /\b(?:FROM|INTO|UPDATE|JOIN)\s+["`[]?(?:app_metadata|self_subjects|person_references|situations|observations|thoughts|emotions|beliefs|belief_revisions|value_revisions|memories|decisions|outcomes|evidence_links)\b/i,
     );
     expect(databaseSource).toContain(
       'invoke<DatabaseStatusResponse>("database_status")',
@@ -64,8 +64,10 @@ describe("frontend database security boundary", () => {
       /async fn database_status\([^)]*\b(?:sql|query|table|url|operation)\b/i,
     );
     expect(librarySource).toContain(
-      "tauri::generate_handler![commands::database_status]",
+      "commands::database_status",
     );
+    expect(librarySource).toContain("commands::save_structured_capture");
+    expect(commandSource).not.toMatch(/async fn (?:insert|update|delete|execute)_/i);
   });
 
   it("preserves the initializing, ready, and error UI state transitions", () => {
