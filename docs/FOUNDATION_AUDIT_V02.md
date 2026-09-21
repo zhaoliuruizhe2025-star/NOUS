@@ -218,3 +218,174 @@ The bounded correction pass changed only the ten governing Markdown files named 
 **Correction validation:** Focused searches and manual diff inspection found no remaining live governing contradiction within F01–F04. D017's old advice clause is explicitly superseded; original audit findings and completed task records remain historical. References to tentative hypotheses, optional gentle invitations, and confirmation for canonical knowledge/EvidenceLink creation do not require perpetual tentative language or constant conversational confirmation. Every changed passage is attributable to F01–F04 or this disposition/status record.
 
 At correction validation, `git diff --check` passed and the audit document was checked for trailing whitespace. The branch was `planning/foundation-audit-v0.2` at `7b7ba78bc55772bb8de795a0babd548038c8286b`, with ten modified tracked Markdown files and this untracked audit document; nothing was staged. Existing Rust/frontend suites were not rerun for these documentation-only corrections. Their results earlier in this document belong to the original audit.
+
+---
+
+## ROUND 3 — FUTURE COMPATIBILITY AUDIT
+
+**Status: technical audit finished; owner review pending. The overall Foundation Audit is not CLOSED.** The Round 2 findings, corrections, and completion statements above remain historical records. This section records the subsequently authorized Round 3 only.
+
+### Repository checkpoint and scope
+
+Verified starting state on 2026-09-20 in `D:\Dev\NOUS`:
+
+- Branch `main`; `HEAD`, local `main`, and the local remote-tracking reference `origin/main` all equaled `ef1983f923d0db8b9beac1081b231de2c3073a40`.
+- Working tree and index were clean. Round 2 was recorded COMPLETE, with F01–F04 and the final Principles §3 wording approved.
+- No Task 007 specification or implementation was present in the inspected checkpoint or working tree; no unexpected changes were present.
+- Created and switched to `planning/foundation-audit-v0.2-round3` at that checkpoint. Branch creation needed sandbox permission. No fetch, commit, merge, push, or history rewrite was performed.
+
+The finite question is whether the approved Foundation through Task 006 can support the owner's Phase B / C / D target without a foundational rewrite. Compatibility means the present semantics and architecture permit the planned capabilities; it does not mean those capabilities already work, that their algorithms have been validated, or that future development needs no new migrations or APIs. This audit does not design those additions or authorize Task 007. Round 2 F01–F04 are not reopened.
+
+Approved Git history and actual implementation determine what is complete. Older roadmap/design status labels describing Tasks 004–006 as proposed do not override that history. The owner's current compatibility target governs this audit; backlog references to external integrations are non-authorizing and do not establish an external AI dependency.
+
+### Exact files inspected
+
+Relevant portions were inspected; the persistence file inspection covered the operation boundary, evidence creation/loading/reconstruction, revision transactions/history, and selected existing tests rather than unrelated implementation cleanup.
+
+**Governing documentation and audit history:**
+
+- `AGENTS.md`
+- `README.md`
+- `docs/PRODUCT.md`
+- `docs/PRINCIPLES.md`
+- `docs/SELF_MODEL.md`
+- `docs/ARCHITECTURE.md`
+- `docs/INTERACTION_MODEL.md`
+- `docs/RESPONSE_POLICY.md`
+- `docs/DECISIONS.md`
+- `docs/ONBOARDING.md`
+- `docs/TASK_SYSTEM.md`
+- `docs/MASTER_PLAN.md`
+- `docs/BACKLOG.md`
+- `docs/FOUNDATION_AUDIT_V02.md`
+- `docs/SAFETY.md`
+- `docs/VOICE_AND_I18N.md`
+- `docs/UI_BOUNDARY.md`
+- `docs/TASK_004_DESIGN.md`
+- `docs/TASK_005_DESIGN.md`
+- `docs/TASK_006_DESIGN.md`
+
+**Implementation, schema, configuration, and existing test evidence:**
+
+- `src-tauri/src/domain/mod.rs`
+- `src-tauri/src/domain/entities.rs`
+- `src-tauri/src/domain/primitives.rs`
+- `src-tauri/src/domain/commitments.rs`
+- `src-tauri/src/domain/lived_experience.rs`
+- `src-tauri/src/domain/evidence.rs`
+- `src-tauri/src/persistence.rs`
+- `src-tauri/src/lib.rs`
+- `src-tauri/src/commands.rs`
+- `src-tauri/migrations/0001_initialize.sql`
+- `src-tauri/migrations/0002_create_self_model.sql`
+- `src-tauri/migrations/0003_create_lived_experience_records.sql`
+- `src-tauri/migrations/0004_create_evidence_links.sql`
+- `src-tauri/capabilities/default.json`
+- `src-tauri/tauri.conf.json`
+- `src-tauri/Cargo.toml`
+- `package.json`
+- `src/app/database.ts`
+- `src/app/App.tsx`
+- `src/i18n/index.ts`
+- `tests/database-boundary.test.ts`
+- `tests/i18n.test.ts`
+
+### Q1–Q10 answers and evidence
+
+#### Q1 — Ontology extensibility
+
+**Compatible.** Separate typed records and ownership anchors do not require every future interpretation to be a Belief, Value, or EvidenceLink. `src-tauri/src/domain/mod.rs` exposes distinct modules/types; `commitments.rs:10` defines `RevisionOrigin` as canonical user-authored history, never system inference. `docs/SELF_MODEL.md:217` explicitly requires future system proposals/results to remain separate and traceable; §§8–9 require evidence references, rule versions, timestamps, uncertainty, and acceptance/rejection/correction history.
+
+The closed Task 006 source/target enums define the existing link contract, not a universal ontology that every future concept must use. `docs/TASK_006_DESIGN.md:62` explicitly leaves evidence for future conclusion types undefined, and its §10 defers general graph relationships. New Pattern, Candidate/Hypothesis, and reasoning concepts can be added without reclassifying existing user records or replacing their ownership/history model. Cycle-safe traversal remains an explicit future requirement in `docs/ARCHITECTURE.md` §§8–9; there is no implemented traversal algorithm or universal acyclic-graph constraint to undo.
+
+#### Q2 — Evidence compatibility
+
+**Compatible as the existing explicit-evidence foundation, not a complete future inference-evidence representation.** `src-tauri/src/domain/evidence.rs:22`, `:52`, `:74`, and `:103` preserve seven source families, exact BeliefRevision/ValueRevision targets, four relations, and UserAuthored provenance. Situation and Emotion may contextualize but cannot serve as proof of a proposition. Migration 0004 checks the legal matrix and enforces same-subject source/anchor ownership plus exact anchor/revision identity through foreign keys.
+
+`persistence.rs:845` inserts a link without changing its target; `:929` and `:964` load links for the specified revision. The existing test at `:4243` checks that later revisions have separate link collections. `evidence.rs:109` and `docs/TASK_006_DESIGN.md` §7.1 say repeated storage adds no evidential weight. No aggregation turns duplicate rows into corroboration. The design's §5 requires deliberate intent for the exact asserted relationship and preserves the distinction between a future proposal and a confirmed link.
+
+Future reasoning can inspect these sources and assertions without treating them as truth or moving them to newer revisions. Candidate evidence, proposal provenance, and broader relationships still need future implementation; the current contract neither supplies them nor requires misusing UserAuthored provenance for them. This is planned extension, not a foundational conflict.
+
+#### Q3 — Temporal compatibility
+
+**Compatible foundation; richer temporal interpretation is expected future work.** Belief/Value anchors preserve identity, and their immutable revisions preserve successive wording, endorsement/importance, and origin. `persistence.rs:1091` and `:1327` append under `BEGIN IMMEDIATE`; history loading orders by revision number. Contextual Situation links and separate Thought/Emotion/Decision/Outcome records preserve distinctions that later contextual interpretation can use. No automatic operation replaces a long-term commitment with current state or makes an earlier interpretation permanently dominant.
+
+`docs/TASK_004_DESIGN.md:58`, `docs/TASK_005_DESIGN.md` §3.6, and `docs/TASK_006_DESIGN.md:215` explicitly distinguish storage creation time from occurrence/effective time. Current domain reads do not expose semantic event time; the model cannot yet reconstruct a full lived chronology or evaluate pattern weakening. Those capabilities are deferred without declaring storage order to be psychological chronology. Future temporal additions can retain existing records and explicitly unknown dates; the foundation does not require inventing or retroactively asserting them. No implemented immutable Pattern or recency rule prevents weakening, obsolescence, or replacement.
+
+#### Q4 — Correction semantics
+
+**Compatible.** `RevisionOrigin::UserUpdate` records actual change; `UserCorrection` records an inaccurate representation (`commitments.rs:10`). Migration 0002 constrains persisted origins, and repository append operations retain the distinction without overwriting earlier rows. The existing test `append_generates_ordered_immutable_belief_and_value_history` (`persistence.rs:6532`) checks both origins and unchanged earlier snapshots for both commitment families.
+
+`docs/SELF_MODEL.md` §§9.1–9.2 distinguish preserved provenance from historical truth: a correction changes current understanding without pretending the mistaken representation was a genuine past state. Future system-interpretation correction is not forced into user-change history. Memory/Decision/Outcome correction is explicitly deferred in `docs/TASK_005_DESIGN.md` §3.7; EvidenceLink correction/rejection is deferred in `docs/TASK_006_DESIGN.md` §7. Their current create/load-only APIs are task boundaries, not a permanent ban on correction. No foundation rewrite is required to add those approved workflows.
+
+#### Q5 — Natural capture compatibility
+
+**Compatible.** `docs/PRODUCT.md` §2.1, `docs/SELF_MODEL.md` §§1.1–1.2, and Decisions D016 distinguish natural expression, raw history, structured experience, and durable knowledge. `docs/ONBOARDING.md` permits skipping questions and continuing with limited context; `docs/UI_BOUNDARY.md` treats forms as replaceable scaffolding, not the normal product interaction.
+
+The actual frontend is a bilingual readiness shell (`src/app/App.tsx`); `database.ts` invokes only `database_status`. `src-tauri/src/lib.rs` registers only that application command, and `commands.rs` accepts no capture payload or arbitrary SQL. No capture service already forces ontology forms or persists every interpretation. Required fields in individual Rust constructors validate an intentionally selected record; they do not require every utterance to produce every record. UTF-8 strings and the locale module impose no English-only content requirement. Natural capture can be added through the intended application boundary, preserving temporary interpretation and deliberate persistence intent, without changing the meaning of existing records. This answer does not specify Task 007 or promise unrestricted language understanding in its first slice.
+
+#### Q6 — Advice / reflection compatibility
+
+**Compatible.** Owner-approved `docs/PRINCIPLES.md` §§3 and 13.1 and `docs/RESPONSE_POLICY.md` §§3.4 and 6 allow requested grounded advice and increasingly direct conclusions while retaining traceability, uncertainty, correction, and final user authority. Evidence includes counterevidence; revisions and Decision/Outcome records are available as future reasoning inputs. No implemented response engine restricts conclusions to permanent tentativeness, blindly repeats past behavior, or establishes advice as an order. Future composition and reasoning can build on these records without redesigning the foundation. This confirms the resolved F01/F02 boundary rather than reopening it.
+
+#### Q7 — Care / Safety compatibility
+
+**Compatible.** `docs/ARCHITECTURE.md` §3 and §3.1 make Care cross-cutting and able to block higher-risk output. `docs/SAFETY.md` §§2–8 prioritize immediate safety and real-world support, forbid diagnosis and suicide scoring, and distinguish temporary interaction states from durable identity. `docs/INTERACTION_MODEL.md` §§5–6 and 9 allow context-sensitive delivery, relevant history only, and Care precedence over Grounded Strength. The current domain/persistence layer contains no mandatory analysis-first response path, diagnostic classifier, or irreversible response-mode assignment. Long-term history can remain an optional contextual input to later Care behavior. The absent detection, routing, and bilingual safety validation are future work; this compatibility result does not certify clinical or crisis-response effectiveness.
+
+#### Q8 — Third-party boundary
+
+**Compatible.** `PersonReference` (`entities.rs:35`) stores a user-owned contextual name, relationship label, and optional notes. Belief/Value owners are typed SelfSubject IDs (`commitments.rs:29`, `:126`); EvidenceSource excludes PersonReference (`evidence.rs:22`). Existing foreign keys do not make contextual people owners of the user's psychological records. Multiple subject rows used for ownership enforcement do not implement a workflow that profiles third parties.
+
+`docs/SELF_MODEL.md` §2 and `docs/INTERACTION_MODEL.md`'s Grounded Strength boundary preserve the user's observation/interpretation and uncertainty about other people's motives. Useful future relationship context does not require turning PersonReference into SelfSubject. No implemented relationship inference, motive score, or person-profile link creates architectural pressure to do so.
+
+#### Q9 — Data sovereignty
+
+**Compatible.** Migrations 0001–0004 store explicit records and links in local SQLite; `lib.rs` registers versioned plugin-managed migrations and the shared pool. The Rust boundary owns SQL, frontend capabilities contain only `core:default`, and manifests/configuration establish no external AI or token-billing dependency. There is no implemented psychological-data transmission path in the inspected application boundary.
+
+`ON DELETE RESTRICT` protects referenced history from accidental removal; it does not forbid deliberate deletion of dependents. `docs/TASK_004_DESIGN.md` §3.1 explicitly allows later user-authorized privacy deletion in dependency order. The inspected schema has no deletion-prohibiting triggers or unavoidable dependency cycle: EvidenceLinks can be removed before their sources/revision targets, Outcomes before Decisions, revisions before anchors, and owned records before SelfSubject. This is feasibility evidence, not an implemented deletion workflow. Local storage, explicit fields, stable identifiers, and transactional writes also leave inspection/export/backup possible. Future application operations, user-facing controls, and safe backup/recovery behavior remain to be implemented; their absence is not lock-in.
+
+#### Q10 — Irreversible assumptions
+
+**No demonstrated foundational incompatibility.** The implemented constraints preserve useful meaning: user ownership, typed record distinctions, immutable historical assertions, exact revision evidence, explicit origins, and local database integrity. Closed enums and SQL checks require deliberate versioned changes if their scope is later extended, but do not require replacing these meanings or retroactively treating old records as something else.
+
+The important limits are explicit: storage timestamps are not lived chronology; EvidenceLink is not a generic inference graph; duplicate assertions are not independent evidence; canonical revisions are not candidate hypotheses; a stored incorrect representation is not a true past psychological state; and the existing readiness API is not a capture/response engine. No current consumer or governing contract requires violating those limits to reach Phase B/C/D. No already-implemented scoring, cloud dependency, permanent identity classifier, or mandatory ontology interaction requires removal. Ordinary future feature design and schema evolution remain necessary; no foundational rewrite is indicated by the inspected evidence.
+
+### BLOCKER / REQUIRED / REVIEW findings
+
+- **BLOCKER:** None.
+- **REQUIRED:** None.
+- **REVIEW:** None. No additional owner decision is needed to resolve a demonstrated ambiguity within this compatibility scope. Owner review of this technical verdict remains required.
+
+### EXPECTED FUTURE WORK — NOT A FOUNDATION DEFECT
+
+- Natural capture and raw history, selective internal structuring with persistence intent, and bilingual create/inspect workflows.
+- Semantic occurrence/effective times, contextual temporal comparison, and correction/history beyond the existing Belief/Value revision operations.
+- Candidate/Hypothesis and Pattern lifecycles, evidence/proposal provenance for future conclusion types, strengthening/weakening/rejection/replacement, and explanation traces.
+- Approved broader relationships and cycle-safe traversal, with semantic duplicate handling before interpreting repeated records as evidence.
+- Response priorities, relevant historical personalization, mature grounded conclusions, requested advice, and Grounded Strength behavior.
+- Operational Care/Safety routing and reviewed bilingual support, including distinction between ordinary distress and acute risk.
+- User-facing inspection, export, privacy deletion, backup/recovery, and correction/rejection controls.
+
+These are existing future targets or explicit deferrals, not new findings, optional improvements, schema proposals, or implementation authorization.
+
+### Validation and limits
+
+Repository/ref/status checks and direct documentation, schema, source, and selected existing-test inspection resolved the compatibility questions. No runtime test suite was needed or rerun; the test results in the Round 2 record are historical results, not new Round 3 executions. No tests or dependencies were added. No user application database was inspected.
+
+`git diff --check` passed after appending this section. Final scope verification showed only `docs/FOUNDATION_AUDIT_V02.md` modified on `planning/foundation-audit-v0.2-round3`; the existing Round 2 record was preserved. No source, migration, test, manifest, dependency, governing product document, task, or roadmap changed. No implementation or Task 007 work occurred. Nothing was staged, committed, merged, or pushed.
+
+### Final technical verdict
+
+PASS
+
+The currently approved Foundation through Task 006 can support the planned Phase B / C / D direction through bounded future additions without a demonstrated need for a foundational rewrite. No BLOCKER or REQUIRED future-compatibility defect was found, and no REVIEW finding remains. The technical audit stops here. Overall Foundation Audit closure awaits owner review; Task 007 remains unstarted and requires separate authorization.
+
+### Final owner review and closure
+
+**Round 3 owner review: PASS.** BLOCKER: none. REQUIRED: none. REVIEW: none.
+
+The owner accepts the Round 3 future-compatibility conclusion: the NOUS Foundation through Task 006 is compatible with the planned Phase B / Phase C / Phase D direction and is accepted as the trusted baseline for returning to development. Missing future capabilities remain future feature work, not Foundation defects.
+
+**Foundation Audit v0.2 is CLOSED.** Round 1, Round 2, and Round 3 are COMPLETE. Task 007 remains unstarted at the moment of closure.
+
+Reopening this Foundation Audit requires new evidence, a real bug, a new requirement, an upstream design change, or a demonstrated downstream conflict. The absence of new evidence is not sufficient reason to reopen it.
