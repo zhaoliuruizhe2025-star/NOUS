@@ -143,6 +143,33 @@ textarea {
   box-shadow: 0 22px 60px rgb(50 60 56 / 8%);
 }
 
+.view-switcher {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 38px auto -28px;
+}
+
+.view-switcher button {
+  cursor: pointer;
+  border: 1px solid #c4cdc7;
+  border-radius: 999px;
+  padding: 8px 15px;
+  color: #5d6a64;
+  background: rgb(255 255 255 / 55%);
+}
+
+.view-switcher button:focus-visible {
+  outline: 2px solid #6f867d;
+  outline-offset: 2px;
+}
+
+.view-switcher .view-switcher__active {
+  border-color: #536e63;
+  color: #fff;
+  background: #536e63;
+}
+
 .capture-card h1 {
   margin: 0;
   color: #23302c;
@@ -313,6 +340,85 @@ textarea {
   line-height: 1.6;
 }
 
+.history-card {
+  width: min(860px, 100%);
+  margin: clamp(60px, 12vh, 110px) auto 0;
+  padding: clamp(28px, 5vw, 52px);
+  border: 1px solid rgb(64 82 75 / 14%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 62%);
+  box-shadow: 0 22px 60px rgb(50 60 56 / 8%);
+}
+
+.history-card h1 {
+  margin: 0;
+  color: #23302c;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.history-scope,
+.history-order,
+.history-empty {
+  color: #66726d;
+  line-height: 1.65;
+}
+
+.history-order {
+  font-size: 0.85rem;
+}
+
+.history-records,
+.history-context-list {
+  display: grid;
+  gap: 18px;
+}
+
+.history-records {
+  margin-top: 30px;
+}
+
+.history-records h2,
+.history-context h3,
+.history-context h4 {
+  color: #33423d;
+}
+
+.history-context {
+  border-radius: 18px;
+  padding: 20px;
+  background: rgb(238 241 236 / 80%);
+}
+
+.history-context h3 {
+  margin: 0 0 16px;
+}
+
+.history-context h4 {
+  margin: 16px 0 8px;
+}
+
+.history-records ul {
+  margin: 0;
+  padding-left: 22px;
+  line-height: 1.65;
+}
+
+.history-records li p {
+  margin: 0;
+}
+
+.history-records li small {
+  color: #66726d;
+}
+
+.history-error {
+  margin-top: 28px;
+  color: #8b4f49;
+}
+
 .saved-records ul {
   padding-left: 20px;
 }
@@ -328,6 +434,12 @@ textarea {
   }
 
   .capture-card {
+    margin-top: 42px;
+    padding: 24px 18px;
+    border-radius: 20px;
+  }
+
+  .history-card {
     margin-top: 42px;
     padding: 24px 18px;
     border-radius: 20px;

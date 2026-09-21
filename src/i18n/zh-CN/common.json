@@ -13,6 +13,11 @@
     "ready": "本地存储已就绪",
     "error": "本地存储初始化失败"
   },
+  "navigation": {
+    "label": "记住功能视图",
+    "capture": "记录",
+    "history": "已保存的记录"
+  },
   "capture": {
     "eyebrow": "记住",
     "composeTitle": "现在有什么事在你心里？",
@@ -54,6 +59,27 @@
       "storageUnavailable": "本地存储尚未就绪，没有保存任何内容。",
       "clockUnavailable": "当前时间不可用，没有保存任何内容。",
       "saveFailed": "这次记录未能保存，也没有保留部分内容。"
+    }
+  },
+  "history": {
+    "eyebrow": "查看",
+    "title": "已保存的背景、经历细节与想法",
+    "scope": "此页面只展示这三类结构化记录，不代表 NOUS 保存的全部长期数据。",
+    "order": "每个区域按保存顺序从新到旧展示，不代表事情实际发生的先后。",
+    "loading": "正在加载已保存的记录……",
+    "empty": "这里还没有已保存的背景、经历细节或想法。",
+    "contexts": "当时的背景",
+    "observations": "你经历到的内容",
+    "thoughts": "当时脑中的想法",
+    "standaloneObservations": "没有关联已保存背景的经历细节",
+    "standaloneThoughts": "没有关联已保存背景的想法",
+    "conviction": "你当时对这个想法的确信程度：{value}/100",
+    "retry": "重试",
+    "errors": {
+      "subjectInvariant": "本地用户记录不一致，因此没有加载任何已保存记录。",
+      "dataInconsistent": "部分已保存记录不一致，因此无法安全展示此页面。",
+      "storageUnavailable": "本地存储尚未就绪。",
+      "loadFailed": "无法加载已保存的记录。"
     }
   }
 }
