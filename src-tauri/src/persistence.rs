@@ -169,6 +169,7 @@ pub(crate) enum PersistenceError {
     Migration(String),
     #[allow(dead_code)]
     NotReady(String),
+    SubjectInvariant(String),
 }
 
 impl fmt::Display for PersistenceError {
@@ -191,6 +192,9 @@ impl fmt::Display for PersistenceError {
             Self::Storage(detail) => write!(formatter, "storage failure: {detail}"),
             Self::Migration(detail) => write!(formatter, "migration failure: {detail}"),
             Self::NotReady(detail) => write!(formatter, "persistence is not ready: {detail}"),
+            Self::SubjectInvariant(detail) => {
+                write!(formatter, "self-subject invariant failure: {detail}")
+            }
         }
     }
 }
@@ -436,6 +440,32 @@ impl SqliteSelfModelRepository {
         .try_into()
     }
 
+    pub(crate) async fn load_single_self_subject_for_capture(
+        &self,
+    ) -> Result<Option<crate::domain::SelfSubject>, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let rows: Vec<(String, String, i64)> = sqlx::query_as(
+            "SELECT id, display_name, created_at_ms FROM self_subjects ORDER BY created_at_ms, id LIMIT 2",
+        )
+        .fetch_all(&mut **connection.connection())
+        .await
+        .map_err(PersistenceError::from)?;
+
+        match rows.as_slice() {
+            [] => Ok(None),
+            [(id, display_name, created_at_ms)] => SelfSubjectRow {
+                id: id.clone(),
+                display_name: display_name.clone(),
+                created_at_ms: *created_at_ms,
+            }
+            .try_into()
+            .map(Some),
+            _ => Err(PersistenceError::SubjectInvariant(
+                "more than one SelfSubject exists".into(),
+            )),
+        }
+    }
+
     pub(crate) async fn create_person_reference(
         &self,
         person: &crate::domain::PersonReference,
@@ -617,6 +647,184 @@ impl SqliteSelfModelRepository {
             created_at_ms,
         }
         .try_into()
+    }
+
+    pub(crate) async fn create_structured_capture_atomic(
+        &self,
+        expected_subject_id: &crate::domain::SelfSubjectId,
+        bootstrap_subject: Option<&crate::domain::SelfSubject>,
+        situation: Option<&crate::domain::Situation>,
+        observations: &[crate::domain::Observation],
+        thoughts: &[crate::domain::Thought],
+        created_at_ms: i64,
+    ) -> Result<(), PersistenceError> {
+        const OPERATION: &str = "create_structured_capture_atomic";
+
+        if situation.is_none() && observations.is_empty() && thoughts.is_empty() {
+            return Err(PersistenceError::ConstraintViolation {
+                operation: OPERATION,
+                detail: "a structured capture must contain at least one record".into(),
+            });
+        }
+        if bootstrap_subject.is_some_and(|subject| subject.id() != expected_subject_id) {
+            return Err(PersistenceError::SubjectInvariant(
+                "bootstrap SelfSubject does not match the expected current subject".into(),
+            ));
+        }
+        if situation.is_some_and(|value| value.subject_id() != expected_subject_id)
+            || observations
+                .iter()
+                .any(|value| value.subject_id() != expected_subject_id)
+            || thoughts
+                .iter()
+                .any(|value| value.subject_id() != expected_subject_id)
+        {
+            return Err(PersistenceError::SubjectInvariant(
+                "capture records do not all belong to the current SelfSubject".into(),
+            ));
+        }
+
+        let expected_situation_id = situation.map(crate::domain::Situation::id);
+        if observations
+            .iter()
+            .any(|value| value.situation_id() != expected_situation_id)
+            || thoughts
+                .iter()
+                .any(|value| value.situation_id() != expected_situation_id)
+        {
+            return Err(PersistenceError::ConstraintViolation {
+                operation: OPERATION,
+                detail: "capture records have an invalid Situation relationship".into(),
+            });
+        }
+
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let mut transaction = (**connection.connection())
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(PersistenceError::from)?;
+
+        let subject_rows: Vec<(String,)> =
+            match sqlx::query_as("SELECT id FROM self_subjects ORDER BY created_at_ms, id LIMIT 2")
+                .fetch_all(&mut *transaction)
+                .await
+            {
+                Ok(rows) => rows,
+                Err(error) => {
+                    let error = PersistenceError::from(error);
+                    transaction
+                        .rollback()
+                        .await
+                        .map_err(PersistenceError::from)?;
+                    return Err(error);
+                }
+            };
+
+        match subject_rows.as_slice() {
+            [] => {
+                let Some(subject) = bootstrap_subject else {
+                    transaction
+                        .rollback()
+                        .await
+                        .map_err(PersistenceError::from)?;
+                    return Err(PersistenceError::SubjectInvariant(
+                        "no current SelfSubject exists and no bootstrap subject was supplied"
+                            .into(),
+                    ));
+                };
+                if let Err(error) = sqlx::query(
+                    "INSERT INTO self_subjects (id, display_name, created_at_ms) VALUES (?, ?, ?)",
+                )
+                .bind(subject.id().as_str())
+                .bind(subject.display_name())
+                .bind(created_at_ms)
+                .execute(&mut *transaction)
+                .await
+                {
+                    let error = write_error(OPERATION, error);
+                    transaction
+                        .rollback()
+                        .await
+                        .map_err(PersistenceError::from)?;
+                    return Err(error);
+                }
+            }
+            [(subject_id,)] if subject_id == expected_subject_id.as_str() => {}
+            [(_subject_id,)] => {
+                transaction
+                    .rollback()
+                    .await
+                    .map_err(PersistenceError::from)?;
+                return Err(PersistenceError::SubjectInvariant(
+                    "the current SelfSubject changed before capture persistence".into(),
+                ));
+            }
+            _ => {
+                transaction
+                    .rollback()
+                    .await
+                    .map_err(PersistenceError::from)?;
+                return Err(PersistenceError::SubjectInvariant(
+                    "more than one SelfSubject exists".into(),
+                ));
+            }
+        }
+
+        if let Some(situation) = situation {
+            if let Err(error) = sqlx::query(
+                "INSERT INTO situations (id, subject_id, description, created_at_ms) VALUES (?, ?, ?, ?)",
+            )
+            .bind(situation.id().as_str())
+            .bind(situation.subject_id().as_str())
+            .bind(situation.description())
+            .bind(created_at_ms)
+            .execute(&mut *transaction)
+            .await
+            {
+                let error = write_error(OPERATION, error);
+                transaction.rollback().await.map_err(PersistenceError::from)?;
+                return Err(error);
+            }
+        }
+
+        for observation in observations {
+            if let Err(error) = sqlx::query(
+                "INSERT INTO observations (id, subject_id, situation_id, content, created_at_ms) VALUES (?, ?, ?, ?, ?)",
+            )
+            .bind(observation.id().as_str())
+            .bind(observation.subject_id().as_str())
+            .bind(observation.situation_id().map(crate::domain::SituationId::as_str))
+            .bind(observation.content())
+            .bind(created_at_ms)
+            .execute(&mut *transaction)
+            .await
+            {
+                let error = write_error(OPERATION, error);
+                transaction.rollback().await.map_err(PersistenceError::from)?;
+                return Err(error);
+            }
+        }
+
+        for thought in thoughts {
+            if let Err(error) = sqlx::query(
+                "INSERT INTO thoughts (id, subject_id, situation_id, content, confidence, created_at_ms) VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .bind(thought.id().as_str())
+            .bind(thought.subject_id().as_str())
+            .bind(thought.situation_id().map(crate::domain::SituationId::as_str))
+            .bind(thought.content())
+            .bind(thought.confidence().map(|value| i64::from(value.value())))
+            .bind(created_at_ms)
+            .execute(&mut *transaction)
+            .await
+            {
+                let error = write_error(OPERATION, error);
+                transaction.rollback().await.map_err(PersistenceError::from)?;
+                return Err(error);
+            }
+        }
+
+        transaction.commit().await.map_err(PersistenceError::from)
     }
 
     pub(crate) async fn create_emotion(
@@ -7413,5 +7621,196 @@ mod tests {
             origin: "InitialUserEntry".into(),
             created_at_ms: 1,
         }));
+    }
+
+    #[test]
+    fn structured_capture_rolls_back_bootstrap_and_earlier_rows_on_late_collision() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject = crate::domain::SelfSubject::new(
+                crate::domain::SelfSubjectId::new("self").unwrap(),
+                "Self",
+            )
+            .unwrap();
+            let situation = crate::domain::Situation::new(
+                crate::domain::SituationId::new("capture-situation").unwrap(),
+                subject.id().clone(),
+                "A confirmed context",
+            )
+            .unwrap();
+            let observation = crate::domain::Observation::new(
+                crate::domain::ObservationId::new("capture-observation").unwrap(),
+                subject.id().clone(),
+                Some(situation.id().clone()),
+                "A confirmed observation",
+            )
+            .unwrap();
+            let thoughts = [
+                crate::domain::Thought::new(
+                    crate::domain::ThoughtId::new("duplicate-thought").unwrap(),
+                    subject.id().clone(),
+                    Some(situation.id().clone()),
+                    "First thought",
+                    None,
+                )
+                .unwrap(),
+                crate::domain::Thought::new(
+                    crate::domain::ThoughtId::new("duplicate-thought").unwrap(),
+                    subject.id().clone(),
+                    Some(situation.id().clone()),
+                    "Second thought",
+                    None,
+                )
+                .unwrap(),
+            ];
+
+            assert!(matches!(
+                repository
+                    .create_structured_capture_atomic(
+                        subject.id(),
+                        Some(&subject),
+                        Some(&situation),
+                        &[observation],
+                        &thoughts,
+                        10,
+                    )
+                    .await,
+                Err(PersistenceError::ConstraintViolation {
+                    operation: "create_structured_capture_atomic",
+                    ..
+                })
+            ));
+
+            for table in ["self_subjects", "situations", "observations", "thoughts"] {
+                let count: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table}"))
+                    .fetch_one(&database.pool)
+                    .await
+                    .unwrap();
+                assert_eq!(count, 0, "transaction left a row in {table}");
+            }
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn structured_capture_rejects_cross_subject_records_before_writing() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repository = repository(&database);
+            let subject_a = create_subject_fixture(&repository, "capture-a").await;
+            let subject_b = create_subject_fixture(&repository, "capture-b").await;
+            let thought = crate::domain::Thought::new(
+                crate::domain::ThoughtId::new("cross-capture-thought").unwrap(),
+                subject_a.id().clone(),
+                None,
+                "Must not cross ownership",
+                None,
+            )
+            .unwrap();
+
+            assert!(matches!(
+                repository
+                    .create_structured_capture_atomic(
+                        subject_b.id(),
+                        None,
+                        None,
+                        &[],
+                        &[thought],
+                        10,
+                    )
+                    .await,
+                Err(PersistenceError::SubjectInvariant(_))
+            ));
+            let same_subject_thought = crate::domain::Thought::new(
+                crate::domain::ThoughtId::new("multiple-subject-thought").unwrap(),
+                subject_a.id().clone(),
+                None,
+                "Must not save while ownership is ambiguous",
+                None,
+            )
+            .unwrap();
+            assert!(matches!(
+                repository
+                    .create_structured_capture_atomic(
+                        subject_a.id(),
+                        None,
+                        None,
+                        &[],
+                        &[same_subject_thought],
+                        11,
+                    )
+                    .await,
+                Err(PersistenceError::SubjectInvariant(_))
+            ));
+            let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM thoughts")
+                .fetch_one(&database.pool)
+                .await
+                .unwrap();
+            assert_eq!(count, 0);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn structured_capture_records_survive_close_and_reopen() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let initial_repository = repository(&database);
+            let subject = crate::domain::SelfSubject::new(
+                crate::domain::SelfSubjectId::new("self").unwrap(),
+                "Self",
+            )
+            .unwrap();
+            let situation = crate::domain::Situation::new(
+                crate::domain::SituationId::new("durable-capture-situation").unwrap(),
+                subject.id().clone(),
+                "Durable context",
+            )
+            .unwrap();
+            let observation = crate::domain::Observation::new(
+                crate::domain::ObservationId::new("durable-capture-observation").unwrap(),
+                subject.id().clone(),
+                Some(situation.id().clone()),
+                "Durable observation",
+            )
+            .unwrap();
+            let thought = crate::domain::Thought::new(
+                crate::domain::ThoughtId::new("durable-capture-thought").unwrap(),
+                subject.id().clone(),
+                Some(situation.id().clone()),
+                "Durable thought",
+                None,
+            )
+            .unwrap();
+
+            initial_repository
+                .create_structured_capture_atomic(
+                    subject.id(),
+                    Some(&subject),
+                    Some(&situation),
+                    std::slice::from_ref(&observation),
+                    std::slice::from_ref(&thought),
+                    10,
+                )
+                .await
+                .unwrap();
+            drop(initial_repository);
+
+            let database = database.reopen().await;
+            let repository = repository(&database);
+            assert_eq!(
+                repository.load_situation(situation.id()).await.unwrap(),
+                situation
+            );
+            assert_eq!(
+                repository.load_observation(observation.id()).await.unwrap(),
+                observation
+            );
+            let loaded_thought = repository.load_thought(thought.id()).await.unwrap();
+            assert_eq!(loaded_thought, thought);
+            assert_eq!(loaded_thought.confidence(), None);
+            database.close().await;
+        });
     }
 }

@@ -1,5 +1,6 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
 
+mod application;
 mod commands;
 pub mod domain;
 mod persistence;
@@ -47,7 +48,10 @@ pub fn run() {
             persistence::install_shared_sqlite_pool(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::database_status])
+        .invoke_handler(tauri::generate_handler![
+            commands::database_status,
+            commands::save_structured_capture
+        ])
         .run(tauri::generate_context!())
         .expect("error while running NOUS");
 }
