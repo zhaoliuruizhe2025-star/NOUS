@@ -16,6 +16,8 @@ Before modifying code:
 8. Read the current task specification.
 9. Inspect existing tests and code before introducing new abstractions.
 
+For modeling, reasoning, or user-response work, also read `docs/REASONING_MODEL.md` for model validation, reasoning integrity, response alignment, and bilingual semantic consistency.
+
 Do not infer the product from a short task prompt when the repository documentation already defines it.
 
 ## 2. Scope discipline

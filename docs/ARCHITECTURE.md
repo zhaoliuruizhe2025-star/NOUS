@@ -80,6 +80,8 @@ Semantic result        Interaction strategy
 
 They should exchange explicit data and remain independently testable. Interaction state is temporary and must not automatically mutate the durable Self Model. The Care Layer can override ordinary strategy and block higher-risk output.
 
+The conceptual reasoning order and validation responsibilities are defined in [REASONING_MODEL.md](REASONING_MODEL.md): Grounding → Modeling → Reasoning → Alignment → Expression, including Model Validation and Reasoning Validation. Response Contract and Self Model relevance guide selection; alignment checks the answer before expression. These are semantic responsibilities within the existing separation, not new runtime services or persistent entities. The pipeline does not require psychological modeling for unrelated factual requests or delay existing Care/Safety overrides.
+
 ## 4. Repository direction
 
 The initial scaffold may resemble:

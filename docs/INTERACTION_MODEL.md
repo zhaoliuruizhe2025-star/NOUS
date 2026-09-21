@@ -11,6 +11,8 @@ The response system has two separate responsibilities:
 
 These systems exchange structured context but should remain independently testable. A plausible interpretation does not justify a long, probing, or psychologically intense response.
 
+The transient Response Contract and alignment check in [REASONING_MODEL.md](REASONING_MODEL.md) constrain both responsibilities. Ordinary emotion and modifiers such as Grounded Strength may shape delivery but must not replace the user's actual task or increase factual certainty. Existing Care/Safety precedence is unchanged.
+
 ## 2. Non-clinical state signals
 
 Interaction states are provisional descriptions of the conversation, not medical or personality labels. They may be uncertain, mixed, and corrected by the user.
@@ -290,3 +292,5 @@ An interaction decision should be testable through a structured trace such as:
 - uncertainty and alternatives.
 
 Tests should cover mixed signals, user correction, minimal-question behavior, history unavailable or irrelevant, bilingual output intent, Grounded Strength activation and non-activation, intensity mismatch, anti-escalation, third-party epistemic limits, and Care Layer precedence.
+
+Future validation must also preserve the same conclusion, uncertainty, advice direction, Pattern scope, safety priority, and agency across equivalent English/Chinese cases under [REASONING_MODEL.md](REASONING_MODEL.md); matching tone or localization keys alone is insufficient.

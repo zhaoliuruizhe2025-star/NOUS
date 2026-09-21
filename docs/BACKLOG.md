@@ -17,8 +17,8 @@ These outcomes are on the path from the current foundation to Private Beta:
 - Task 005 Memory, Decision, and Outcome;
 - Task 006 Evidence foundation and explicit relationships;
 - basic Remember workflows;
-- explicit connections and reasoning traces;
-- adaptive response routing and interaction strategy;
+- Phase C explicit connections, evidence-grounded Pattern/Candidate reasoning, model validation, counterevidence, context/time scope, and faithful reasoning traces under `docs/REASONING_MODEL.md`;
+- Phase D response alignment, relevant Self Model selection, requested advice from validated reasoning, explainability, adaptive interaction, and bilingual semantic consistency under `docs/REASONING_MODEL.md`;
 - Mirror, correction, and evidence views;
 - Product Experience / UI-UX work that replaces the Task 001 scaffold before beta;
 - Care routing, distress/crisis behavior, bilingual human-reviewed care copy, and safety-focused tests;

@@ -160,18 +160,22 @@ Exit evidence:
 
 Milestone goal: connect approved records without opaque or overconfident inference.
 
+Future design must follow [REASONING_MODEL.md](REASONING_MODEL.md) for evidence-grounded Pattern/Candidate reasoning, model validation, and reasoning integrity. These requirements do not start Phase C or authorize new numbered tasks.
+
 Likely task slices:
 
 - explicit relationships and evidence links;
 - cycle-safe graph traversal;
-- recurring-pattern candidates;
-- structured reasoning traces;
+- evidence-grounded Pattern/Candidate interpretations with model validation, material counterevidence, and plausible alternatives;
+- bounded context and temporal scope, including later evidence weakening or replacing an interpretation;
+- faithful reasoning provenance/traces that connect conclusions to the actual evidence and major reasoning factors;
 - user confirmation, rejection, and correction.
 
 Exit evidence:
 
 - every surfaced connection can show why it exists;
 - uncertainty and source records are available;
+- important interpretations and reasoning steps preserve premise types and exact revision context without treating duplicate records as independent corroboration, under `REASONING_MODEL.md`;
 - a casual statement does not silently become a durable self-model conclusion.
 
 ### Phase D — Reflect and interact
@@ -184,10 +188,14 @@ Likely task slices:
 - adaptive interaction strategy from `docs/INTERACTION_MODEL.md`;
 - optional Action -> Explanation -> Reflection strategy where appropriate;
 - concrete translation of abstract reasoning;
-- use of relevant user history when available;
-- bilingual voice and safety-copy review.
+- Response Contract and question/goal alignment, including dependencies among explicit sub-questions;
+- selection of Self Model history through the relevance gate;
+- requested advice based on validated reasoning, with faithful user-facing explanations and preserved agency;
+- bilingual semantic consistency of conclusions, uncertainty, advice, scope, and safety priority, alongside voice and safety-copy review.
 
 Content understanding and interaction strategy must remain separate. A correct interpretation can still be delivered with the wrong verbosity, warmth, directness, or question frequency.
+
+Exit evidence must show that responses answer the Primary Ask and explicit sub-questions, omit unrelated personal history, preserve ordinary task needs when emotion is present, and retain equivalent reasoning semantics in English and Simplified Chinese. Apply [REASONING_MODEL.md](REASONING_MODEL.md) with existing Care/Safety precedence; implementation still requires separately approved tasks.
 
 ### Phase E — Mirror
 

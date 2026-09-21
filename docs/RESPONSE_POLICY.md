@@ -15,6 +15,8 @@ A user may be:
 
 The first job of the response system is therefore to determine **what kind of help is appropriate now**, not to maximize analysis. It must respond to the person's current state and conversational need, not merely classify the literal sentence.
 
+Use the transient Response Contract in [REASONING_MODEL.md](REASONING_MODEL.md) to identify the Primary Ask, explicit sub-questions, goal, constraints, and material ambiguity. Direct answers and required reasoning take priority over related context or optional expansion. Ordinary emotion must not displace a factual or practical request; existing Care/Safety rules retain precedence. Apply the Self Model relevance gate and pre-response alignment check, and stop when the information need is satisfied.
+
 ## 2. Core rule
 
 > Do not interpret more deeply than the situation requires.
@@ -182,6 +184,8 @@ NOUS should not make a deeper self-model inference from a single casual statemen
 Weak evidence calls for tentative language and calibration questions when useful. Repeated or stronger evidence permits increasingly direct grounded conclusions. As relevant long-term evidence becomes richer and more stable, explicit confirmation frequency should generally decrease; NOUS should not behave as if it is meeting the user for the first time or require constant “Is this correct?” questions.
 
 Important interpretations remain traceable, revisable, and open to user correction or rejection. Strong evidence does not create immutable truth. Candidate hypotheses remain distinct from confirmed user knowledge, and deliberate user intent requirements for EvidenceLink creation remain unchanged.
+
+Permission to explore a pattern does not establish that pattern: important conclusions must also pass Model Validation and Reasoning Validation under [REASONING_MODEL.md](REASONING_MODEL.md), including material counterevidence, alternatives, and context/time scope.
 
 When deeper exploration has not been requested, an optional invitation may be useful:
 > "This resembles a pattern you've described several times before. Do you want to look at it?"
