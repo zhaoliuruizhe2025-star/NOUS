@@ -67,6 +67,13 @@ describe("frontend database security boundary", () => {
       "commands::database_status",
     );
     expect(librarySource).toContain("commands::save_structured_capture");
+    expect(librarySource).toContain("commands::load_structured_history");
+    expect(commandSource).toMatch(
+      /async fn load_structured_history\(\s*database: State<'_, SharedSqlitePool>,?\s*\)/,
+    );
+    expect(commandSource).not.toMatch(
+      /async fn load_structured_history\([^)]*\b(?:subject|sql|query|table|filter|order)\b/i,
+    );
     expect(commandSource).not.toMatch(/async fn (?:insert|update|delete|execute)_/i);
   });
 

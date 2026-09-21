@@ -13,6 +13,11 @@
     "ready": "Local storage is ready",
     "error": "Local storage could not be initialized"
   },
+  "navigation": {
+    "label": "Remember views",
+    "capture": "Capture",
+    "history": "Saved records"
+  },
   "capture": {
     "eyebrow": "Remember",
     "composeTitle": "What is on your mind?",
@@ -54,6 +59,27 @@
       "storageUnavailable": "Local storage is not ready. No information was saved.",
       "clockUnavailable": "The current time is unavailable. No information was saved.",
       "saveFailed": "The capture could not be saved. No partial information was kept."
+    }
+  },
+  "history": {
+    "eyebrow": "Inspect",
+    "title": "Saved contexts, experienced details, and thoughts",
+    "scope": "This view shows these three kinds of structured records. It is not a complete view of all data NOUS holds.",
+    "order": "Newest saved first within each section. Save order does not represent when events occurred.",
+    "loading": "Loading saved records…",
+    "empty": "No saved contexts, experienced details, or thoughts yet.",
+    "contexts": "Contexts",
+    "observations": "What you experienced",
+    "thoughts": "What went through your mind",
+    "standaloneObservations": "Experienced details without a saved context",
+    "standaloneThoughts": "Thoughts without a saved context",
+    "conviction": "How strongly you believed this thought at the time: {value}/100",
+    "retry": "Try again",
+    "errors": {
+      "subjectInvariant": "The local user record is inconsistent, so no saved records were loaded.",
+      "dataInconsistent": "Some saved records are inconsistent, so this view could not be loaded safely.",
+      "storageUnavailable": "Local storage is not ready.",
+      "loadFailed": "Saved records could not be loaded."
     }
   }
 }

@@ -19,6 +19,21 @@ describe("localization", () => {
     expect(Object.keys(getMessages("zh-CN").capture.errors)).toEqual(
       Object.keys(getMessages("en").capture.errors),
     );
+    expect(Object.keys(getMessages("zh-CN").navigation)).toEqual(
+      Object.keys(getMessages("en").navigation),
+    );
+    expect(Object.keys(getMessages("zh-CN").history)).toEqual(
+      Object.keys(getMessages("en").history),
+    );
+    expect(Object.keys(getMessages("zh-CN").history.errors)).toEqual(
+      Object.keys(getMessages("en").history.errors),
+    );
+    expect(getMessages("en").history.scope).toContain("not a complete view");
+    expect(getMessages("zh-CN").history.scope).toContain("不代表");
+    expect(getMessages("en").history.order).toContain("does not represent when events occurred");
+    expect(getMessages("zh-CN").history.order).toContain("不代表事情实际发生");
+    expect(getMessages("en").history.conviction).toContain("you believed");
+    expect(getMessages("zh-CN").history.conviction).toContain("你当时");
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {

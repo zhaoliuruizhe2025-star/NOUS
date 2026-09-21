@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { LanguageSelector } from "../components/LanguageSelector";
 import { StructuredCapture } from "../components/StructuredCapture";
+import { StructuredHistory } from "../components/StructuredHistory";
 import {
   getMessages,
   resolveInitialLocale,
@@ -10,6 +11,7 @@ import {
 import { initializeDatabase } from "./database";
 
 type DatabaseStatus = "initializing" | "ready" | "error";
+type AppView = "capture" | "history";
 
 export function App() {
   const [locale, setLocale] = useState<Locale>(() =>
@@ -17,6 +19,7 @@ export function App() {
   );
   const [databaseStatus, setDatabaseStatus] =
     useState<DatabaseStatus>("initializing");
+  const [view, setView] = useState<AppView>("capture");
   const messages = useMemo(() => getMessages(locale), [locale]);
 
   useEffect(() => {
@@ -52,7 +55,31 @@ export function App() {
       </header>
 
       {databaseStatus === "ready" ? (
-        <StructuredCapture messages={messages} />
+        <>
+          <nav className="view-switcher" aria-label={messages.navigation.label}>
+            <button
+              className={view === "capture" ? "view-switcher__active" : ""}
+              type="button"
+              aria-current={view === "capture" ? "page" : undefined}
+              onClick={() => setView("capture")}
+            >
+              {messages.navigation.capture}
+            </button>
+            <button
+              className={view === "history" ? "view-switcher__active" : ""}
+              type="button"
+              aria-current={view === "history" ? "page" : undefined}
+              onClick={() => setView("history")}
+            >
+              {messages.navigation.history}
+            </button>
+          </nav>
+          {view === "capture" ? (
+            <StructuredCapture messages={messages} />
+          ) : (
+            <StructuredHistory messages={messages} />
+          )}
+        </>
       ) : (
         <section className="landing" aria-labelledby="landing-title">
           <p className="eyebrow">{messages.loop}</p>

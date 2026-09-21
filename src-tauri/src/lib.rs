@@ -50,7 +50,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::database_status,
-            commands::save_structured_capture
+            commands::save_structured_capture,
+            commands::load_structured_history
         ])
         .run(tauri::generate_context!())
         .expect("error while running NOUS");

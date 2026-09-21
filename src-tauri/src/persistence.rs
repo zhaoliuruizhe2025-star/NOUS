@@ -274,6 +274,42 @@ type ValueRevisionDatabaseRow = (
 );
 
 #[derive(Clone, Debug)]
+pub(crate) struct HistorySituationRecord {
+    pub(crate) value: crate::domain::Situation,
+    pub(crate) created_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct HistoryObservationRecord {
+    pub(crate) value: crate::domain::Observation,
+    pub(crate) created_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct HistoryThoughtRecord {
+    pub(crate) value: crate::domain::Thought,
+    pub(crate) created_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct StructuredHistoryRecords {
+    pub(crate) situations: Vec<HistorySituationRecord>,
+    pub(crate) observations: Vec<HistoryObservationRecord>,
+    pub(crate) thoughts: Vec<HistoryThoughtRecord>,
+}
+
+fn structured_history_inconsistency(
+    field: &'static str,
+    detail: impl Into<String>,
+) -> PersistenceError {
+    PersistenceError::DomainReconstruction {
+        entity: "StructuredHistory",
+        field,
+        detail: detail.into(),
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct InitialBeliefRevisionInput {
     id: crate::domain::BeliefRevisionId,
     proposition: String,
@@ -647,6 +683,175 @@ impl SqliteSelfModelRepository {
             created_at_ms,
         }
         .try_into()
+    }
+
+    /// Loads the complete Task 008 inspect scope from one consistent read snapshot.
+    ///
+    /// Rows are deliberately not filtered by subject before ownership validation so corrupt
+    /// single-user data cannot be hidden behind a successful, apparently complete response.
+    pub(crate) async fn load_structured_history(
+        &self,
+    ) -> Result<StructuredHistoryRecords, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let mut transaction = (**connection.connection())
+            .begin()
+            .await
+            .map_err(PersistenceError::from)?;
+
+        let subject_rows: Vec<(String, String, i64)> = sqlx::query_as(
+            "SELECT id, display_name, created_at_ms FROM self_subjects ORDER BY created_at_ms, id LIMIT 2",
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(PersistenceError::from)?;
+
+        if subject_rows.len() > 1 {
+            return Err(PersistenceError::SubjectInvariant(
+                "more than one SelfSubject exists".into(),
+            ));
+        }
+
+        let current_subject: Option<crate::domain::SelfSubject> = subject_rows
+            .into_iter()
+            .next()
+            .map(|(id, display_name, created_at_ms)| {
+                SelfSubjectRow {
+                    id,
+                    display_name,
+                    created_at_ms,
+                }
+                .try_into()
+            })
+            .transpose()?;
+
+        let situation_rows: Vec<(String, String, String, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, description, created_at_ms FROM situations ORDER BY created_at_ms DESC, id DESC",
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(PersistenceError::from)?;
+        let observation_rows: Vec<(String, String, Option<String>, String, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, situation_id, content, created_at_ms FROM observations ORDER BY created_at_ms DESC, id DESC",
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(PersistenceError::from)?;
+        let thought_rows: Vec<ThoughtDatabaseRow> = sqlx::query_as(
+            "SELECT id, subject_id, situation_id, content, confidence, created_at_ms FROM thoughts ORDER BY created_at_ms DESC, id DESC",
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(PersistenceError::from)?;
+
+        let situations = situation_rows
+            .into_iter()
+            .map(|(id, subject_id, description, created_at_ms)| {
+                let value = SituationRow {
+                    id,
+                    subject_id,
+                    description,
+                    created_at_ms,
+                }
+                .try_into()?;
+                Ok(HistorySituationRecord {
+                    value,
+                    created_at_ms,
+                })
+            })
+            .collect::<Result<Vec<_>, PersistenceError>>()?;
+        let observations = observation_rows
+            .into_iter()
+            .map(|(id, subject_id, situation_id, content, created_at_ms)| {
+                let value = ObservationRow {
+                    id,
+                    subject_id,
+                    situation_id,
+                    content,
+                    created_at_ms,
+                }
+                .try_into()?;
+                Ok(HistoryObservationRecord {
+                    value,
+                    created_at_ms,
+                })
+            })
+            .collect::<Result<Vec<_>, PersistenceError>>()?;
+        let thoughts = thought_rows
+            .into_iter()
+            .map(
+                |(id, subject_id, situation_id, content, confidence, created_at_ms)| {
+                    let value = ThoughtRow {
+                        id,
+                        subject_id,
+                        situation_id,
+                        content,
+                        confidence,
+                        created_at_ms,
+                    }
+                    .try_into()?;
+                    Ok(HistoryThoughtRecord {
+                        value,
+                        created_at_ms,
+                    })
+                },
+            )
+            .collect::<Result<Vec<_>, PersistenceError>>()?;
+
+        match current_subject.as_ref() {
+            None if situations.is_empty() && observations.is_empty() && thoughts.is_empty() => {}
+            None => {
+                return Err(structured_history_inconsistency(
+                    "subject_id",
+                    "inspect-scope records exist without a SelfSubject",
+                ));
+            }
+            Some(subject)
+                if situations
+                    .iter()
+                    .any(|record| record.value.subject_id() != subject.id())
+                    || observations
+                        .iter()
+                        .any(|record| record.value.subject_id() != subject.id())
+                    || thoughts
+                        .iter()
+                        .any(|record| record.value.subject_id() != subject.id()) =>
+            {
+                return Err(structured_history_inconsistency(
+                    "subject_id",
+                    "an inspect-scope record does not belong to the current SelfSubject",
+                ));
+            }
+            Some(_) => {}
+        }
+
+        let situation_ids: std::collections::HashSet<&str> = situations
+            .iter()
+            .map(|record| record.value.id().as_str())
+            .collect();
+        if observations.iter().any(|record| {
+            record
+                .value
+                .situation_id()
+                .is_some_and(|id| !situation_ids.contains(id.as_str()))
+        }) || thoughts.iter().any(|record| {
+            record
+                .value
+                .situation_id()
+                .is_some_and(|id| !situation_ids.contains(id.as_str()))
+        }) {
+            return Err(structured_history_inconsistency(
+                "situation_id",
+                "an inspect-scope relationship references a missing Situation",
+            ));
+        }
+
+        transaction.commit().await.map_err(PersistenceError::from)?;
+
+        Ok(StructuredHistoryRecords {
+            situations,
+            observations,
+            thoughts,
+        })
     }
 
     pub(crate) async fn create_structured_capture_atomic(

@@ -5,9 +5,10 @@ use tauri::State;
 
 use crate::{
     application::{
+        load_structured_history as load_structured_history_workflow,
         save_structured_capture as save_structured_capture_workflow, ObservationCaptureInput,
         SaveStructuredCaptureInput, SavedStructuredCapture, SituationCaptureInput,
-        StructuredCaptureError, ThoughtCaptureInput,
+        StructuredCaptureError, StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
     },
     persistence::{PersistenceError, SharedSqlitePool, SqliteSelfModelRepository},
 };
@@ -89,6 +90,44 @@ pub(crate) struct StructuredCaptureCommandError {
     item_index: Option<usize>,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredHistoryObservationResponse {
+    id: String,
+    content: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredHistoryThoughtResponse {
+    id: String,
+    content: String,
+    subjective_conviction: Option<u8>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredHistoryContextResponse {
+    id: String,
+    description: String,
+    observations: Vec<StructuredHistoryObservationResponse>,
+    thoughts: Vec<StructuredHistoryThoughtResponse>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredHistoryResponse {
+    contexts: Vec<StructuredHistoryContextResponse>,
+    standalone_observations: Vec<StructuredHistoryObservationResponse>,
+    standalone_thoughts: Vec<StructuredHistoryThoughtResponse>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredHistoryCommandError {
+    code: &'static str,
+}
+
 /// Reports readiness for the one database managed and migrated by the SQL plugin.
 ///
 /// The command deliberately accepts no caller-selected SQL, table, path, or operation.
@@ -113,6 +152,14 @@ pub(crate) async fn save_structured_capture(
     save_structured_capture_for_pool(&database, request, created_at_ms).await
 }
 
+/// Loads the fixed read-only Task 008 inspect scope without caller-selected authority or filters.
+#[tauri::command]
+pub(crate) async fn load_structured_history(
+    database: State<'_, SharedSqlitePool>,
+) -> Result<StructuredHistoryResponse, StructuredHistoryCommandError> {
+    load_structured_history_for_pool(&database).await
+}
+
 async fn save_structured_capture_for_pool(
     database: &SharedSqlitePool,
     request: SaveStructuredCaptureRequest,
@@ -123,6 +170,16 @@ async fn save_structured_capture_for_pool(
         .await
         .map_err(map_capture_error)?;
     Ok(saved.into())
+}
+
+async fn load_structured_history_for_pool(
+    database: &SharedSqlitePool,
+) -> Result<StructuredHistoryResponse, StructuredHistoryCommandError> {
+    let repository = SqliteSelfModelRepository::new(database.clone());
+    let history = load_structured_history_workflow(&repository)
+        .await
+        .map_err(map_history_error)?;
+    Ok(history.into())
 }
 
 fn command_error(code: &'static str, item_index: Option<usize>) -> StructuredCaptureCommandError {
@@ -150,6 +207,21 @@ fn map_capture_error(error: StructuredCaptureError) -> StructuredCaptureCommandE
         }
         StructuredCaptureError::Persistence(_) => command_error("saveFailed", None),
     }
+}
+
+fn map_history_error(error: StructuredHistoryError) -> StructuredHistoryCommandError {
+    let code = match error {
+        StructuredHistoryError::DataInconsistent
+        | StructuredHistoryError::Persistence(PersistenceError::DomainReconstruction { .. }) => {
+            "dataInconsistent"
+        }
+        StructuredHistoryError::Persistence(PersistenceError::SubjectInvariant(_)) => {
+            "subjectInvariant"
+        }
+        StructuredHistoryError::Persistence(PersistenceError::NotReady(_)) => "storageUnavailable",
+        StructuredHistoryError::Persistence(_) => "loadFailed",
+    };
+    StructuredHistoryCommandError { code }
 }
 
 impl From<SaveStructuredCaptureRequest> for SaveStructuredCaptureInput {
@@ -209,6 +281,55 @@ impl From<SavedStructuredCapture> for SavedStructuredCaptureResponse {
     }
 }
 
+impl From<StructuredHistory> for StructuredHistoryResponse {
+    fn from(history: StructuredHistory) -> Self {
+        Self {
+            contexts: history
+                .contexts
+                .into_iter()
+                .map(|context| StructuredHistoryContextResponse {
+                    id: context.id,
+                    description: context.description,
+                    observations: context
+                        .observations
+                        .into_iter()
+                        .map(|observation| StructuredHistoryObservationResponse {
+                            id: observation.id,
+                            content: observation.content,
+                        })
+                        .collect(),
+                    thoughts: context
+                        .thoughts
+                        .into_iter()
+                        .map(|thought| StructuredHistoryThoughtResponse {
+                            id: thought.id,
+                            content: thought.content,
+                            subjective_conviction: thought.subjective_conviction,
+                        })
+                        .collect(),
+                })
+                .collect(),
+            standalone_observations: history
+                .standalone_observations
+                .into_iter()
+                .map(|observation| StructuredHistoryObservationResponse {
+                    id: observation.id,
+                    content: observation.content,
+                })
+                .collect(),
+            standalone_thoughts: history
+                .standalone_thoughts
+                .into_iter()
+                .map(|thought| StructuredHistoryThoughtResponse {
+                    id: thought.id,
+                    content: thought.content,
+                    subjective_conviction: thought.subjective_conviction,
+                })
+                .collect(),
+        }
+    }
+}
+
 async fn database_status_for_pool(
     database: &SharedSqlitePool,
 ) -> Result<DatabaseStatus, &'static str> {
@@ -237,8 +358,9 @@ fn status_for_schema_version(schema_version: Option<&str>) -> Result<DatabaseSta
 #[cfg(test)]
 mod tests {
     use super::{
-        database_status_for_pool, map_capture_error, status_for_schema_version, DatabaseStatus,
-        SaveStructuredCaptureRequest, StructuredCaptureError, READINESS_ERROR,
+        database_status_for_pool, map_capture_error, map_history_error, status_for_schema_version,
+        DatabaseStatus, SaveStructuredCaptureRequest, StructuredCaptureError,
+        StructuredHistoryCommandError, StructuredHistoryError, READINESS_ERROR,
     };
     use crate::persistence::{PersistenceError, SharedSqlitePool};
     use sqlx::sqlite::SqlitePoolOptions;
@@ -305,6 +427,46 @@ mod tests {
         assert_eq!(serialized, r#"{"code":"saveFailed","itemIndex":null}"#);
         assert!(!serialized.contains("SQL"));
         assert!(!serialized.contains("secret"));
+    }
+
+    #[test]
+    fn structured_history_errors_expose_only_safe_codes() {
+        for (error, expected) in [
+            (
+                StructuredHistoryError::Persistence(PersistenceError::SubjectInvariant(
+                    "private detail".into(),
+                )),
+                "subjectInvariant",
+            ),
+            (
+                StructuredHistoryError::Persistence(PersistenceError::DomainReconstruction {
+                    entity: "Thought",
+                    field: "content",
+                    detail: "raw row detail".into(),
+                }),
+                "dataInconsistent",
+            ),
+            (
+                StructuredHistoryError::Persistence(PersistenceError::NotReady(
+                    "database path".into(),
+                )),
+                "storageUnavailable",
+            ),
+            (
+                StructuredHistoryError::Persistence(PersistenceError::Storage(
+                    "SQL SELECT failed".into(),
+                )),
+                "loadFailed",
+            ),
+        ] {
+            let mapped = map_history_error(error);
+            assert_eq!(mapped, StructuredHistoryCommandError { code: expected });
+            let serialized = serde_json::to_string(&mapped).unwrap();
+            assert!(!serialized.contains("SQL"));
+            assert!(!serialized.contains("Thought"));
+            assert!(!serialized.contains("path"));
+            assert!(!serialized.contains("detail"));
+        }
     }
 
     #[test]
