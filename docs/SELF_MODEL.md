@@ -428,21 +428,19 @@ NOUS may derive patterns such as:
 - differences between stated Values and past Decisions;
 - changing interpretations across similar Situations.
 
-Derived patterns must store:
-- evidence references;
-- calculation/rule version;
-- timestamp;
-- uncertainty.
+When a derived Pattern is durably stored under a separately approved future design, its inspectable provenance must preserve evidence references, the actual calculation/rule version where applicable, recording time as storage metadata, and uncertainty. This durability requirement does not authorize storing the transient Task 013 Candidate. A stored timestamp does not establish when the represented experience occurred.
 
 Derived patterns must remain provisional and must not turn weak or isolated material into deterministic labels. A strong, relevant pattern may inform a light reminder or hypothesis, but it never overrides the user's correction or agency.
 
 Future Pattern/Candidate/Hypothesis interpretations must satisfy the Model Validation, counterevidence, context scope, temporal validity, and conclusion-strength requirements in [REASONING_MODEL.md](REASONING_MODEL.md). Provisional means revisable; it does not require permanent tentative wording when evidence supports a clear conclusion. These conceptual validation dimensions define no new entity, table, or numeric confidence scale.
 
+Under the approved [Task 012 architecture](TASK_012_DESIGN.md), a Candidate is a reviewable possible recurring structure that may be proposed by the user or NOUS; the Task 013 first slice is user-initiated and transient. Hypothesis is a reasoning role, not a separate durable entity. A durable Pattern requires Model Validation and explicit user acceptance of both its claim and its bounded scope. Evidence assessment, user acceptance, and current applicability remain separate. Task 006 user-authored EvidenceLinks do not become derived Pattern provenance. Correction or deletion of an underlying source requires revalidation before an affected interpretation can be used again. Any future durable derived model must carry its own inspect, correction, change, delete, export, backup, and provenance obligations.
+
 ## 9. User correction
 
-A user can reject or revise system interpretation.
+A user can reject or revise system interpretation. Task 013's first Candidate review retains this interaction only transiently; any future durable record of an interpretation or the user's response needs its own approved lifecycle.
 
-The system should preserve:
+When an interpretation is durably retained under a separately approved workflow, its provenance should preserve:
 - what NOUS inferred;
 - whether the user accepted/rejected it;
 - the corrected interpretation, if provided.

@@ -162,6 +162,8 @@ Milestone goal: connect approved records without opaque or overconfident inferen
 
 Future design must follow [REASONING_MODEL.md](REASONING_MODEL.md) for evidence-grounded Pattern/Candidate reasoning, model validation, and reasoning integrity. These requirements do not start Phase C or authorize new numbered tasks.
 
+The Owner-approved [Task 012 Connect architecture](TASK_012_DESIGN.md) fixes Candidate as a reviewable possible recurring structure, Hypothesis as a reasoning role rather than a durable entity, and Pattern as a validated, explicitly user-accepted, context- and time-bounded durable interpretation. Its first recommended implementation slice, Task 013 Transient Candidate Review Foundation, is user-initiated: the user proposes wording and selects current Situation, Observation, or Thought records, can mark evidence roles and adjust claim/scope, and retains no Candidate, Pattern, or Hypothesis after the review. Task 013 still needs its own bounded scope and approval before implementation. Automatic detection and durable derived persistence are not authorized by Task 012.
+
 Likely task slices:
 
 - explicit relationships and evidence links;
