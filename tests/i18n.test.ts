@@ -44,6 +44,12 @@ describe("localization", () => {
     expect(getMessages("zh-CN").correction.explanation).toContain("后来真的发生了变化");
     expect(getMessages("en").correction.priorMeaning).toContain("not true past user states");
     expect(getMessages("zh-CN").correction.priorMeaning).toContain("并非用户真实的过去状态");
+    expect(Object.keys(getMessages("zh-CN").deletion)).toEqual(Object.keys(getMessages("en").deletion));
+    expect(Object.keys(getMessages("zh-CN").deletion.errors)).toEqual(Object.keys(getMessages("en").deletion.errors));
+    expect(getMessages("en").deletion.confirm).toBe("Permanently delete");
+    expect(getMessages("zh-CN").deletion.confirm).toBe("永久删除");
+    expect(getMessages("en").deletion.consequence).toContain("cannot be undone");
+    expect(getMessages("zh-CN").deletion.consequence).toContain("无法撤销");
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {

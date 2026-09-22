@@ -58,7 +58,8 @@ pub fn run() {
             commands::database_status,
             commands::save_structured_capture,
             commands::load_structured_history,
-            commands::correct_structured_record
+            commands::correct_structured_record,
+            commands::delete_structured_record
         ])
         .run(tauri::generate_context!())
         .expect("error while running NOUS");

@@ -82,6 +82,25 @@
       "loadFailed": "Saved records could not be loaded."
     }
   },
+  "deletion": {
+    "open": "Delete record",
+    "title": "Permanently delete this record?",
+    "consequence": "Deleting this record also removes its correction history from the current NOUS database. This cannot be undone in the current version.",
+    "cancel": "Cancel",
+    "confirm": "Permanently delete",
+    "deleting": "Deleting…",
+    "reload": "Reload saved records",
+    "errors": {
+      "targetNotFound": "This record could not be found. Nothing was deleted.",
+      "staleDelete": "This record changed after you opened it. Reload and review it before deleting.",
+      "dependencyBlocked": "This record is still used by other saved NOUS data, so it cannot be safely deleted yet.",
+      "subjectInvariant": "The local user record is inconsistent. Nothing was deleted.",
+      "dataInconsistent": "Saved data is inconsistent. Nothing was deleted.",
+      "storageUnavailable": "Local storage is not ready. Nothing was deleted.",
+      "deleteConflict": "The deletion conflicted with local data. Nothing was deleted.",
+      "deleteFailed": "The record could not be deleted. No partial deletion was kept."
+    }
+  },
   "correction": {
     "open": "Correct inaccurate record",
     "title": "Correct inaccurate record",

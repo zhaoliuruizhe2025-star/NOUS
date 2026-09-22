@@ -69,6 +69,7 @@ describe("frontend database security boundary", () => {
     expect(librarySource).toContain("commands::save_structured_capture");
     expect(librarySource).toContain("commands::load_structured_history");
     expect(librarySource).toContain("commands::correct_structured_record");
+    expect(librarySource).toContain("commands::delete_structured_record");
     expect(commandSource).toContain("enum CorrectStructuredRecordRequest");
     expect(commandSource).toContain("deny_unknown_fields");
     expect(commandSource).toMatch(
@@ -77,7 +78,9 @@ describe("frontend database security boundary", () => {
     expect(commandSource).not.toMatch(
       /async fn load_structured_history\([^)]*\b(?:subject|sql|query|table|filter|order)\b/i,
     );
-    expect(commandSource).not.toMatch(/async fn (?:insert|update|delete|execute)_/i);
+    expect(commandSource).toContain("enum DeleteStructuredRecordRequest");
+    expect(commandSource).not.toMatch(/async fn (?:insert|update|execute)_/i);
+    expect(commandSource).not.toMatch(/async fn delete_(?!structured_record\b)/i);
   });
 
   it("preserves the initializing, ready, and error UI state transitions", () => {
