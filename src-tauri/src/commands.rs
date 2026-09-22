@@ -2,16 +2,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 
 use crate::{
     application::{
         correct_structured_record as correct_structured_record_workflow,
-        delete_structured_record as delete_structured_record_workflow,
+        create_database_backup_to_path,
+        delete_structured_record as delete_structured_record_workflow, export_user_data_to_path,
         load_structured_history as load_structured_history_workflow,
-        save_structured_capture as save_structured_capture_workflow, CorrectionInput,
-        DeletionInput, ObservationCaptureInput, SaveStructuredCaptureInput, SavedStructuredCapture,
-        SituationCaptureInput, StructuredCaptureError, StructuredCorrectionError,
-        StructuredDeletionError, StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
+        save_structured_capture as save_structured_capture_workflow, ArtifactError, BackupError,
+        CorrectionInput, DeletionInput, ObservationCaptureInput, PortableExportError,
+        SaveStructuredCaptureInput, SavedStructuredCapture, SituationCaptureInput,
+        StructuredCaptureError, StructuredCorrectionError, StructuredDeletionError,
+        StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
     },
     persistence::{PersistenceError, SharedSqlitePool, SqliteSelfModelRepository},
 };
@@ -269,6 +272,16 @@ pub(crate) struct StructuredDeletionCommandError {
     code: &'static str,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub(crate) struct PortabilityResult {
+    status: &'static str,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub(crate) struct PortabilityCommandError {
+    code: &'static str,
+}
+
 /// Reports readiness for the one database managed and migrated by the SQL plugin.
 ///
 /// The command deliberately accepts no caller-selected SQL, table, path, or operation.
@@ -330,6 +343,116 @@ pub(crate) async fn delete_structured_record(
         .await
         .map_err(map_deletion_error)?;
     Ok(result.into())
+}
+
+async fn choose_save_destination(
+    app: tauri::AppHandle,
+    kind: &'static str,
+    extension: &'static str,
+) -> Result<Option<std::path::PathBuf>, PortabilityCommandError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| PortabilityCommandError {
+            code: "destinationUnavailable",
+        })?
+        .as_millis();
+    let filename = format!("nous-{kind}-{now}.{extension}");
+    let selected = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .set_file_name(filename)
+            .add_filter(extension.to_uppercase(), &[extension])
+            .blocking_save_file()
+    })
+    .await
+    .map_err(|_| PortabilityCommandError {
+        code: "destinationUnavailable",
+    })?;
+    selected
+        .map(|path| {
+            path.into_path().map_err(|_| PortabilityCommandError {
+                code: "destinationUnavailable",
+            })
+        })
+        .transpose()
+}
+
+#[tauri::command]
+pub(crate) async fn export_user_data(
+    app: tauri::AppHandle,
+    database: State<'_, SharedSqlitePool>,
+) -> Result<PortabilityResult, PortabilityCommandError> {
+    let Some(destination) = choose_save_destination(app, "export", "json").await? else {
+        return Ok(PortabilityResult {
+            status: "cancelled",
+        });
+    };
+    let exported_at_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .ok_or(PortabilityCommandError {
+            code: "exportFailed",
+        })?;
+    let repository = SqliteSelfModelRepository::new(database.inner().clone());
+    export_user_data_to_path(&repository, &destination, exported_at_ms)
+        .await
+        .map_err(map_export_error)?;
+    Ok(PortabilityResult {
+        status: "completed",
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn create_database_backup(
+    app: tauri::AppHandle,
+    database: State<'_, SharedSqlitePool>,
+) -> Result<PortabilityResult, PortabilityCommandError> {
+    let Some(destination) = choose_save_destination(app, "backup", "sqlite").await? else {
+        return Ok(PortabilityResult {
+            status: "cancelled",
+        });
+    };
+    let repository = SqliteSelfModelRepository::new(database.inner().clone());
+    create_database_backup_to_path(&repository, &destination)
+        .await
+        .map_err(map_backup_error)?;
+    Ok(PortabilityResult {
+        status: "completed",
+    })
+}
+
+fn map_artifact_error(error: ArtifactError) -> &'static str {
+    match error {
+        ArtifactError::DestinationExists => "destinationExists",
+        ArtifactError::DestinationUnavailable => "destinationUnavailable",
+        ArtifactError::WriteFailed => "destinationUnavailable",
+    }
+}
+
+fn map_export_error(error: PortableExportError) -> PortabilityCommandError {
+    let code = match error {
+        PortableExportError::Persistence(PersistenceError::SubjectInvariant(_)) => {
+            "subjectInvariant"
+        }
+        PortableExportError::Persistence(
+            PersistenceError::DataInconsistent(_) | PersistenceError::DomainReconstruction { .. },
+        ) => "dataInconsistent",
+        PortableExportError::Persistence(PersistenceError::NotReady(_)) => "storageUnavailable",
+        PortableExportError::Persistence(_) => "exportFailed",
+        PortableExportError::Serialization => "serializationFailed",
+        PortableExportError::Artifact(error) => map_artifact_error(error),
+    };
+    PortabilityCommandError { code }
+}
+
+fn map_backup_error(error: BackupError) -> PortabilityCommandError {
+    let code = match error {
+        BackupError::Storage(PersistenceError::NotReady(_)) => "storageUnavailable",
+        BackupError::Storage(_) | BackupError::Validation => "backupFailed",
+        BackupError::Artifact(error) => map_artifact_error(error),
+    };
+    PortabilityCommandError { code }
 }
 
 fn map_deletion_error(error: StructuredDeletionError) -> StructuredDeletionCommandError {
@@ -795,8 +918,35 @@ mod tests {
         StructuredCaptureError, StructuredCorrectionError, StructuredDeletionError,
         StructuredHistoryCommandError, StructuredHistoryError, READINESS_ERROR,
     };
+    use super::{
+        map_backup_error, map_export_error, ArtifactError, BackupError, PortableExportError,
+    };
     use crate::persistence::{PersistenceError, SharedSqlitePool};
     use sqlx::sqlite::SqlitePoolOptions;
+
+    #[test]
+    fn portability_errors_expose_only_safe_categories() {
+        let export = map_export_error(PortableExportError::Persistence(
+            PersistenceError::DataInconsistent("private row and SQL path".into()),
+        ));
+        let backup = map_backup_error(BackupError::Storage(PersistenceError::Storage(
+            "C:\\private\\database.sqlite".into(),
+        )));
+        let exists = map_export_error(PortableExportError::Artifact(
+            ArtifactError::DestinationExists,
+        ));
+        assert_eq!(export.code, "dataInconsistent");
+        assert_eq!(backup.code, "backupFailed");
+        assert_eq!(exists.code, "destinationExists");
+        for value in [
+            serde_json::to_string(&export).unwrap(),
+            serde_json::to_string(&backup).unwrap(),
+        ] {
+            assert!(!value.contains("private"));
+            assert!(!value.contains("SQL"));
+            assert!(!value.contains("sqlite"));
+        }
+    }
 
     #[test]
     fn reports_ready_only_for_the_expected_schema_version() {

@@ -326,6 +326,7 @@ pub(crate) struct SituationCorrectionRecord {
     pub(crate) before_description: String,
     pub(crate) after_description: String,
     pub(crate) user_note: Option<String>,
+    pub(crate) recorded_at_ms: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -336,6 +337,7 @@ pub(crate) struct ObservationCorrectionRecord {
     pub(crate) before_situation_id: Option<crate::domain::SituationId>,
     pub(crate) after_situation_id: Option<crate::domain::SituationId>,
     pub(crate) user_note: Option<String>,
+    pub(crate) recorded_at_ms: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -348,6 +350,7 @@ pub(crate) struct ThoughtCorrectionRecord {
     pub(crate) before_confidence: Option<crate::domain::ThoughtConfidence>,
     pub(crate) after_confidence: Option<crate::domain::ThoughtConfidence>,
     pub(crate) user_note: Option<String>,
+    pub(crate) recorded_at_ms: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -355,6 +358,37 @@ pub(crate) struct StructuredHistoryRecords {
     pub(crate) situations: Vec<HistorySituationRecord>,
     pub(crate) observations: Vec<HistoryObservationRecord>,
     pub(crate) thoughts: Vec<HistoryThoughtRecord>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SavedRecord<T> {
+    pub(crate) value: T,
+    pub(crate) saved_at_ms: i64,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SavedBelief {
+    pub(crate) record: SavedRecord<crate::domain::Belief>,
+    pub(crate) revisions: Vec<SavedRecord<crate::domain::BeliefRevision>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct SavedValue {
+    pub(crate) record: SavedRecord<crate::domain::Value>,
+    pub(crate) revisions: Vec<SavedRecord<crate::domain::ValueRevision>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PortableUserDataSnapshot {
+    pub(crate) history: StructuredHistoryRecords,
+    pub(crate) people: Vec<SavedRecord<crate::domain::PersonReference>>,
+    pub(crate) emotions: Vec<SavedRecord<crate::domain::Emotion>>,
+    pub(crate) beliefs: Vec<SavedBelief>,
+    pub(crate) values: Vec<SavedValue>,
+    pub(crate) memories: Vec<SavedRecord<crate::domain::Memory>>,
+    pub(crate) decisions: Vec<SavedRecord<crate::domain::Decision>>,
+    pub(crate) outcomes: Vec<SavedRecord<crate::domain::Outcome>>,
+    pub(crate) evidence_links: Vec<SavedRecord<crate::domain::EvidenceLink>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -448,6 +482,7 @@ struct ValidatedSituationCorrection {
     before_state_token: String,
     after_state_token: String,
     user_note: Option<String>,
+    recorded_at_ms: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -462,6 +497,7 @@ struct ValidatedObservationCorrection {
     before_state_token: String,
     after_state_token: String,
     user_note: Option<String>,
+    recorded_at_ms: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -478,6 +514,7 @@ struct ValidatedThoughtCorrection {
     before_state_token: String,
     after_state_token: String,
     user_note: Option<String>,
+    recorded_at_ms: i64,
 }
 
 fn structured_history_inconsistency(
@@ -882,6 +919,38 @@ impl SqliteSelfModelRepository {
         let records = load_structured_history_snapshot(&mut transaction).await?;
         transaction.commit().await.map_err(PersistenceError::from)?;
         Ok(records)
+    }
+
+    /// Reads the entire persisted user domain in a single validated SQLite snapshot.
+    pub(crate) async fn load_portable_user_data_snapshot(
+        &self,
+    ) -> Result<PortableUserDataSnapshot, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let mut transaction = (**connection.connection())
+            .begin()
+            .await
+            .map_err(PersistenceError::from)?;
+        let snapshot = load_portable_user_data_snapshot_in_transaction(&mut transaction).await?;
+        transaction.commit().await.map_err(PersistenceError::from)?;
+        Ok(snapshot)
+    }
+
+    /// SQLite makes a consistent logical copy of the open source database. The destination
+    /// expression is bound; no selected path is ever concatenated into SQL.
+    pub(crate) async fn vacuum_into(
+        &self,
+        destination: &std::path::Path,
+    ) -> Result<(), PersistenceError> {
+        let path = destination
+            .to_str()
+            .ok_or_else(|| PersistenceError::Storage("destination is not UTF-8".into()))?;
+        let mut connection = self.database.acquire_verified_connection().await?;
+        sqlx::query("VACUUM INTO ?")
+            .bind(path)
+            .execute(&mut **connection.connection())
+            .await
+            .map_err(PersistenceError::from)?;
+        Ok(())
     }
 
     pub(crate) async fn correct_structured_record_atomic(
@@ -2624,6 +2693,341 @@ fn checked_token(
     }
 }
 
+fn saved_record<T>(value: T, saved_at_ms: i64) -> Result<SavedRecord<T>, PersistenceError> {
+    if saved_at_ms < 0 {
+        return Err(PersistenceError::DataInconsistent(
+            "negative storage timestamp".into(),
+        ));
+    }
+    Ok(SavedRecord { value, saved_at_ms })
+}
+
+async fn load_portable_user_data_snapshot_in_transaction(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<PortableUserDataSnapshot, PersistenceError> {
+    use crate::domain::{EvidenceSource, EvidenceTarget};
+    use std::collections::{HashMap, HashSet};
+
+    let history = load_structured_history_snapshot(transaction).await?;
+    let schema_version: Option<String> =
+        sqlx::query_scalar("SELECT value FROM app_metadata WHERE key = 'schema_version'")
+            .fetch_optional(&mut **transaction)
+            .await
+            .map_err(PersistenceError::from)?;
+    if schema_version.as_deref() != Some("5") {
+        return Err(PersistenceError::DataInconsistent(
+            "schema version is not 5".into(),
+        ));
+    }
+    let subject_rows: Vec<SelfSubjectRow> = sqlx::query_as(
+        "SELECT id, display_name, created_at_ms FROM self_subjects ORDER BY id LIMIT 2",
+    )
+    .fetch_all(&mut **transaction)
+    .await
+    .map_err(PersistenceError::from)?;
+    if subject_rows.len() > 1 {
+        return Err(PersistenceError::SubjectInvariant(
+            "multiple SelfSubjects".into(),
+        ));
+    }
+    let subject: Option<crate::domain::SelfSubject> = subject_rows
+        .into_iter()
+        .next()
+        .map(|row| {
+            if row.created_at_ms < 0 {
+                return Err(PersistenceError::DataInconsistent(
+                    "negative subject timestamp".into(),
+                ));
+            }
+            row.try_into()
+        })
+        .transpose()?;
+
+    // Every user-domain table is read without a subject predicate. Ownership is checked only
+    // after all rows are visible, so a foreign or orphan row cannot be silently omitted.
+    let person_rows: Vec<PersonReferenceRow> = sqlx::query_as("SELECT id, subject_id, display_name, relationship_label, context_notes, created_at_ms FROM person_references ORDER BY id")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let emotion_rows: Vec<EmotionRow> = sqlx::query_as("SELECT id, subject_id, situation_id, label, intensity, created_at_ms FROM emotions ORDER BY id")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let belief_rows: Vec<BeliefRow> =
+        sqlx::query_as("SELECT id, subject_id, created_at_ms FROM beliefs ORDER BY id")
+            .fetch_all(&mut **transaction)
+            .await
+            .map_err(PersistenceError::from)?;
+    let belief_revision_rows: Vec<BeliefRevisionRow> = sqlx::query_as("SELECT id, belief_id, revision_number, proposition, endorsement, change_note, origin, created_at_ms FROM belief_revisions ORDER BY belief_id, revision_number")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let value_rows: Vec<ValueRow> =
+        sqlx::query_as("SELECT id, subject_id, created_at_ms FROM \"values\" ORDER BY id")
+            .fetch_all(&mut **transaction)
+            .await
+            .map_err(PersistenceError::from)?;
+    let value_revision_rows: Vec<ValueRevisionRow> = sqlx::query_as("SELECT id, value_id, revision_number, label, importance, change_note, origin, created_at_ms FROM value_revisions ORDER BY value_id, revision_number")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let memory_rows: Vec<MemoryRow> = sqlx::query_as("SELECT id, subject_id, situation_id, description, user_meaning, created_at_ms FROM memories ORDER BY id")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let decision_rows: Vec<DecisionRow> = sqlx::query_as("SELECT id, subject_id, situation_id, description, created_at_ms FROM decisions ORDER BY id")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let outcome_rows: Vec<OutcomeRow> = sqlx::query_as(
+        "SELECT id, subject_id, decision_id, description, created_at_ms FROM outcomes ORDER BY id",
+    )
+    .fetch_all(&mut **transaction)
+    .await
+    .map_err(PersistenceError::from)?;
+    let evidence_rows: Vec<EvidenceLinkRow> = sqlx::query_as("SELECT id, subject_id, relationship_kind, provenance, source_kind, source_observation_id, source_thought_id, source_emotion_id, source_situation_id, source_memory_id, source_decision_id, source_outcome_id, target_kind, target_belief_id, target_belief_revision_id, target_value_id, target_value_revision_id, user_note, created_at_ms FROM evidence_links ORDER BY id")
+        .fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+
+    let has_other_rows = !person_rows.is_empty()
+        || !emotion_rows.is_empty()
+        || !belief_rows.is_empty()
+        || !belief_revision_rows.is_empty()
+        || !value_rows.is_empty()
+        || !value_revision_rows.is_empty()
+        || !memory_rows.is_empty()
+        || !decision_rows.is_empty()
+        || !outcome_rows.is_empty()
+        || !evidence_rows.is_empty();
+    if subject.is_none() && has_other_rows {
+        return Err(PersistenceError::DataInconsistent(
+            "user records exist without SelfSubject".into(),
+        ));
+    }
+
+    let people: Vec<SavedRecord<crate::domain::PersonReference>> = person_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            saved_record(row.try_into()?, time)
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let emotions: Vec<SavedRecord<crate::domain::Emotion>> = emotion_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            saved_record(row.try_into()?, time)
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let memories: Vec<SavedRecord<crate::domain::Memory>> = memory_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            saved_record(row.try_into()?, time)
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let decisions: Vec<SavedRecord<crate::domain::Decision>> = decision_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            saved_record(row.try_into()?, time)
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let outcomes: Vec<SavedRecord<crate::domain::Outcome>> = outcome_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            saved_record(row.try_into()?, time)
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let evidence_links: Vec<SavedRecord<crate::domain::EvidenceLink>> = evidence_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            saved_record(row.try_into()?, time)
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+
+    let mut beliefs = belief_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            Ok(SavedBelief {
+                record: saved_record(row.try_into()?, time)?,
+                revisions: Vec::new(),
+            })
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let mut values = value_rows
+        .into_iter()
+        .map(|row| {
+            let time = row.created_at_ms;
+            Ok(SavedValue {
+                record: saved_record(row.try_into()?, time)?,
+                revisions: Vec::new(),
+            })
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let belief_positions: HashMap<String, usize> = beliefs
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| (entry.record.value.id().as_str().to_owned(), index))
+        .collect();
+    let value_positions: HashMap<String, usize> = values
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| (entry.record.value.id().as_str().to_owned(), index))
+        .collect();
+    for row in belief_revision_rows {
+        let time = row.created_at_ms;
+        let revision: crate::domain::BeliefRevision = row.try_into()?;
+        let index = belief_positions
+            .get(revision.belief_id().as_str())
+            .ok_or_else(|| PersistenceError::DataInconsistent("orphan Belief revision".into()))?;
+        let revisions = &mut beliefs[*index].revisions;
+        if u64::from(revision.revision_number().value()) != revisions.len() as u64 + 1 {
+            return Err(PersistenceError::DataInconsistent(
+                "Belief revision sequence is broken".into(),
+            ));
+        }
+        revisions.push(saved_record(revision, time)?);
+    }
+    for row in value_revision_rows {
+        let time = row.created_at_ms;
+        let revision: crate::domain::ValueRevision = row.try_into()?;
+        let index = value_positions
+            .get(revision.value_id().as_str())
+            .ok_or_else(|| PersistenceError::DataInconsistent("orphan Value revision".into()))?;
+        let revisions = &mut values[*index].revisions;
+        if u64::from(revision.revision_number().value()) != revisions.len() as u64 + 1 {
+            return Err(PersistenceError::DataInconsistent(
+                "Value revision sequence is broken".into(),
+            ));
+        }
+        revisions.push(saved_record(revision, time)?);
+    }
+
+    if let Some(subject) = &subject {
+        let subject_id = subject.id();
+        if people.iter().any(|r| r.value.subject_id() != subject_id)
+            || emotions.iter().any(|r| r.value.subject_id() != subject_id)
+            || memories.iter().any(|r| r.value.subject_id() != subject_id)
+            || decisions.iter().any(|r| r.value.subject_id() != subject_id)
+            || outcomes.iter().any(|r| r.value.subject_id() != subject_id)
+            || evidence_links
+                .iter()
+                .any(|r| r.value.subject_id() != subject_id)
+            || beliefs
+                .iter()
+                .any(|r| r.record.value.subject_id() != subject_id)
+            || values
+                .iter()
+                .any(|r| r.record.value.subject_id() != subject_id)
+        {
+            return Err(PersistenceError::DataInconsistent(
+                "foreign subject ownership".into(),
+            ));
+        }
+    }
+
+    let situation_ids: HashSet<&str> = history
+        .situations
+        .iter()
+        .map(|r| r.value.id().as_str())
+        .collect();
+    let observation_ids: HashSet<&str> = history
+        .observations
+        .iter()
+        .map(|r| r.value.id().as_str())
+        .collect();
+    let thought_ids: HashSet<&str> = history
+        .thoughts
+        .iter()
+        .map(|r| r.value.id().as_str())
+        .collect();
+    let emotion_ids: HashSet<&str> = emotions.iter().map(|r| r.value.id().as_str()).collect();
+    let memory_ids: HashSet<&str> = memories.iter().map(|r| r.value.id().as_str()).collect();
+    let decision_ids: HashSet<&str> = decisions.iter().map(|r| r.value.id().as_str()).collect();
+    let outcome_ids: HashSet<&str> = outcomes.iter().map(|r| r.value.id().as_str()).collect();
+    let belief_revision_ids: HashSet<(&str, &str)> = beliefs
+        .iter()
+        .flat_map(|b| {
+            b.revisions
+                .iter()
+                .map(move |r| (b.record.value.id().as_str(), r.value.id().as_str()))
+        })
+        .collect();
+    let value_revision_ids: HashSet<(&str, &str)> = values
+        .iter()
+        .flat_map(|v| {
+            v.revisions
+                .iter()
+                .map(move |r| (v.record.value.id().as_str(), r.value.id().as_str()))
+        })
+        .collect();
+    let has_bad_context = emotions.iter().any(|r| {
+        r.value
+            .situation_id()
+            .is_some_and(|id| !situation_ids.contains(id.as_str()))
+    }) || memories.iter().any(|r| {
+        r.value
+            .situation_id()
+            .is_some_and(|id| !situation_ids.contains(id.as_str()))
+    }) || decisions.iter().any(|r| {
+        r.value
+            .situation_id()
+            .is_some_and(|id| !situation_ids.contains(id.as_str()))
+    });
+    if has_bad_context
+        || outcomes
+            .iter()
+            .any(|r| !decision_ids.contains(r.value.decision_id().as_str()))
+    {
+        return Err(PersistenceError::DataInconsistent(
+            "orphan domain relationship".into(),
+        ));
+    }
+    for record in &evidence_links {
+        let link = &record.value;
+        let valid_source = match link.source() {
+            EvidenceSource::Situation(id) => situation_ids.contains(id.as_str()),
+            EvidenceSource::Observation(id) => observation_ids.contains(id.as_str()),
+            EvidenceSource::Thought(id) => thought_ids.contains(id.as_str()),
+            EvidenceSource::Emotion(id) => emotion_ids.contains(id.as_str()),
+            EvidenceSource::Memory(id) => memory_ids.contains(id.as_str()),
+            EvidenceSource::Decision(id) => decision_ids.contains(id.as_str()),
+            EvidenceSource::Outcome(id) => outcome_ids.contains(id.as_str()),
+        };
+        let valid_target = match link.target() {
+            EvidenceTarget::BeliefRevision {
+                belief_id,
+                revision_id,
+            } => belief_revision_ids.contains(&(belief_id.as_str(), revision_id.as_str())),
+            EvidenceTarget::ValueRevision {
+                value_id,
+                revision_id,
+            } => value_revision_ids.contains(&(value_id.as_str(), revision_id.as_str())),
+        };
+        if !valid_source || !valid_target {
+            return Err(PersistenceError::DataInconsistent(
+                "EvidenceLink reference is invalid".into(),
+            ));
+        }
+    }
+    for record in history
+        .situations
+        .iter()
+        .map(|r| r.created_at_ms)
+        .chain(history.observations.iter().map(|r| r.created_at_ms))
+        .chain(history.thoughts.iter().map(|r| r.created_at_ms))
+    {
+        if record < 0 {
+            return Err(PersistenceError::DataInconsistent(
+                "negative storage timestamp".into(),
+            ));
+        }
+    }
+
+    Ok(PortableUserDataSnapshot {
+        history,
+        people,
+        emotions,
+        beliefs,
+        values,
+        memories,
+        decisions,
+        outcomes,
+        evidence_links,
+    })
+}
+
 async fn load_structured_history_snapshot(
     transaction: &mut Transaction<'_, Sqlite>,
 ) -> Result<StructuredHistoryRecords, PersistenceError> {
@@ -2854,6 +3258,7 @@ async fn load_structured_history_snapshot(
                     after_token,
                 )?,
                 user_note: checked_optional_note("SituationCorrection", note)?,
+                recorded_at_ms,
             });
     }
 
@@ -2943,6 +3348,7 @@ async fn load_structured_history_snapshot(
                     after_token,
                 )?,
                 user_note: checked_optional_note("ObservationCorrection", note)?,
+                recorded_at_ms,
             });
     }
 
@@ -3057,6 +3463,7 @@ async fn load_structured_history_snapshot(
                     after_token,
                 )?,
                 user_note: checked_optional_note("ThoughtCorrection", note)?,
+                recorded_at_ms,
             });
     }
 
@@ -3103,6 +3510,7 @@ fn validate_situation_chains(
                 before_description: correction.before_description.clone(),
                 after_description: correction.after_description.clone(),
                 user_note: correction.user_note.clone(),
+                recorded_at_ms: correction.recorded_at_ms,
             });
         }
         if expected_description != Some(record.value.description()) {
@@ -3176,6 +3584,7 @@ fn validate_observation_chains(
                 before_situation_id: correction.before_situation_id.clone(),
                 after_situation_id: correction.after_situation_id.clone(),
                 user_note: correction.user_note.clone(),
+                recorded_at_ms: correction.recorded_at_ms,
             });
         }
         if expected != Some((record.value.content(), record.value.situation_id())) {
@@ -3259,6 +3668,7 @@ fn validate_thought_chains(
                 before_confidence: correction.before_confidence,
                 after_confidence: correction.after_confidence,
                 user_note: correction.user_note.clone(),
+                recorded_at_ms: correction.recorded_at_ms,
             });
         }
         if expected
@@ -3286,7 +3696,7 @@ fn validate_thought_chains(
 }
 
 /// Persistence rows retain storage-only `created_at_ms` while reconstruction uses domain APIs.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct SelfSubjectRow {
     pub(crate) id: String,
     pub(crate) display_name: String,
@@ -3311,7 +3721,7 @@ impl TryFrom<SelfSubjectRow> for crate::domain::SelfSubject {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct PersonReferenceRow {
     pub(crate) id: String,
     pub(crate) subject_id: String,
@@ -3469,7 +3879,7 @@ impl TryFrom<ThoughtRow> for crate::domain::Thought {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct EmotionRow {
     pub(crate) id: String,
     pub(crate) subject_id: String,
@@ -3517,7 +3927,7 @@ impl TryFrom<EmotionRow> for crate::domain::Emotion {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 struct MemoryRow {
     id: String,
     subject_id: String,
@@ -3562,7 +3972,7 @@ impl TryFrom<MemoryRow> for crate::domain::Memory {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 struct DecisionRow {
     id: String,
     subject_id: String,
@@ -3600,7 +4010,7 @@ impl TryFrom<DecisionRow> for crate::domain::Decision {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 struct OutcomeRow {
     id: String,
     subject_id: String,
@@ -4083,7 +4493,7 @@ impl TryFrom<EvidenceLinkRow> for crate::domain::EvidenceLink {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct BeliefRevisionRow {
     pub(crate) id: String,
     pub(crate) belief_id: String,
@@ -4095,7 +4505,7 @@ pub(crate) struct BeliefRevisionRow {
     pub(crate) created_at_ms: i64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct BeliefRow {
     pub(crate) id: String,
     pub(crate) subject_id: String,
@@ -4117,7 +4527,7 @@ impl TryFrom<BeliefRow> for crate::domain::Belief {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct ValueRevisionRow {
     pub(crate) id: String,
     pub(crate) value_id: String,
@@ -4129,7 +4539,7 @@ pub(crate) struct ValueRevisionRow {
     pub(crate) created_at_ms: i64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, sqlx::FromRow)]
 pub(crate) struct ValueRow {
     pub(crate) id: String,
     pub(crate) subject_id: String,
@@ -9369,6 +9779,216 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(count, 0);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn portable_snapshot_includes_all_persisted_domain_types_and_corrections() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            sqlx::raw_sql(r#"
+                INSERT INTO self_subjects VALUES ('self', 'Self', 1);
+                INSERT INTO person_references VALUES ('p', 'self', 'Teammate', 'colleague', NULL, 2);
+                INSERT INTO situations VALUES ('s', 'self', 'Meeting on Thursday', 3);
+                INSERT INTO observations VALUES ('o', 'self', 's', 'They said they were busy', 4);
+                INSERT INTO thoughts VALUES ('t', 'self', 's', 'I worried', 60, 5);
+                INSERT INTO emotions VALUES ('e', 'self', 's', 'Uneasy', 40, 6);
+                INSERT INTO beliefs VALUES ('b', 'self', 7);
+                INSERT INTO belief_revisions VALUES ('br', 'b', 1, 'I can ask for help', 80, NULL, 'InitialUserEntry', 8);
+                INSERT INTO "values" VALUES ('v', 'self', 9);
+                INSERT INTO value_revisions VALUES ('vr', 'v', 1, 'Honesty', 90, NULL, 'InitialUserEntry', 10);
+                INSERT INTO memories VALUES ('m', 'self', 's', 'A meeting', NULL, 11);
+                INSERT INTO decisions VALUES ('d', 'self', 's', 'I asked', 12);
+                INSERT INTO outcomes VALUES ('u', 'self', 'd', 'They answered', 13);
+                INSERT INTO evidence_links (id, subject_id, relationship_kind, provenance, source_kind, source_observation_id, target_kind, target_belief_id, target_belief_revision_id, user_note, created_at_ms)
+                    VALUES ('link', 'self', 'Supports', 'UserAuthored', 'Observation', 'o', 'BeliefRevision', 'b', 'br', NULL, 14);
+                INSERT INTO thought_corrections VALUES ('t', 'self', 1, 'I panicked', 'I worried', 's', 's', 90, 60, 'initial:thought:t', 'corrected:thought:0123456789abcdef0123456789abcdef', 'Corrected wording', 15);
+            "#).execute(&database.pool).await.unwrap();
+            let repo = repository(&database);
+            let snapshot = repo.load_portable_user_data_snapshot().await.unwrap();
+            assert_eq!(snapshot.people.len(), 1);
+            assert_eq!(snapshot.history.situations.len(), 1);
+            assert_eq!(snapshot.history.observations.len(), 1);
+            assert_eq!(snapshot.history.thoughts.len(), 1);
+            assert_eq!(snapshot.emotions.len(), 1);
+            assert_eq!(snapshot.beliefs[0].revisions.len(), 1);
+            assert_eq!(snapshot.values[0].revisions.len(), 1);
+            assert_eq!(snapshot.memories.len(), 1);
+            assert_eq!(snapshot.decisions.len(), 1);
+            assert_eq!(snapshot.outcomes.len(), 1);
+            assert_eq!(snapshot.evidence_links.len(), 1);
+            assert_eq!(
+                snapshot.history.thoughts[0].corrections[0].recorded_at_ms,
+                15
+            );
+            let destination = database.directory.join("portable.json");
+            crate::application::export_user_data_to_path(&repo, &destination, 20)
+                .await
+                .unwrap();
+            let document: serde_json::Value =
+                serde_json::from_slice(&fs::read(&destination).unwrap()).unwrap();
+            for collection in [
+                "people",
+                "situations",
+                "observations",
+                "thoughts",
+                "emotions",
+                "beliefs",
+                "values",
+                "memories",
+                "decisions",
+                "outcomes",
+                "evidenceLinks",
+            ] {
+                assert_eq!(
+                    document[collection].as_array().unwrap().len(),
+                    1,
+                    "{collection}"
+                );
+            }
+            assert_eq!(document["thoughts"][0]["content"], "I worried");
+            assert_eq!(
+                document["representationCorrections"]["thoughts"][0]
+                    ["priorInaccurateRepresentation"]["content"],
+                "I panicked"
+            );
+            assert_eq!(
+                document["representationCorrections"]["thoughts"][0]["recordedAtMs"],
+                15
+            );
+            drop(repo);
+            let database = database.reopen().await;
+            let repo = repository(&database);
+            let second_destination = database.directory.join("after-reopen.json");
+            crate::application::export_user_data_to_path(&repo, &second_destination, 21)
+                .await
+                .unwrap();
+            let second: serde_json::Value =
+                serde_json::from_slice(&fs::read(&second_destination).unwrap()).unwrap();
+            assert_eq!(second["thoughts"], document["thoughts"]);
+            let mut connection = database.pool.acquire().await.unwrap();
+            sqlx::query("PRAGMA foreign_keys = OFF")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            sqlx::query(
+                "UPDATE evidence_links SET target_belief_revision_id = 'missing' WHERE id = 'link'",
+            )
+            .execute(&mut *connection)
+            .await
+            .unwrap();
+            sqlx::query("PRAGMA foreign_keys = ON")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            drop(connection);
+            let rejected_destination = database.directory.join("rejected.json");
+            assert!(
+                crate::application::export_user_data_to_path(&repo, &rejected_destination, 22)
+                    .await
+                    .is_err()
+            );
+            assert!(!rejected_destination.exists());
+            drop(repo);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn portable_snapshot_empty_and_corrupt_boundaries() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repo = repository(&database);
+            let empty = repo.load_portable_user_data_snapshot().await.unwrap();
+            assert!(empty.people.is_empty());
+            assert!(empty.history.situations.is_empty());
+            let subjects: i64 = sqlx::query_scalar("SELECT count(*) FROM self_subjects")
+                .fetch_one(&database.pool)
+                .await
+                .unwrap();
+            assert_eq!(subjects, 0);
+            sqlx::query("INSERT INTO self_subjects VALUES ('self', 'Self', 1)")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO person_references VALUES ('p', 'self', 'Person', 'known', NULL, 2)",
+            )
+            .execute(&database.pool)
+            .await
+            .unwrap();
+            let mut connection = database.pool.acquire().await.unwrap();
+            sqlx::query("PRAGMA ignore_check_constraints = ON")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE person_references SET display_name = '   ' WHERE id = 'p'")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            sqlx::query("PRAGMA ignore_check_constraints = OFF")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            drop(connection);
+            assert!(matches!(
+                repo.load_portable_user_data_snapshot().await,
+                Err(PersistenceError::DomainReconstruction { .. })
+            ));
+            drop(repo);
+            database.close().await;
+        });
+    }
+
+    #[test]
+    fn portable_snapshot_does_not_hide_subject_or_revision_corruption() {
+        tauri::async_runtime::block_on(async {
+            let database = migrated_database().await;
+            let repo = repository(&database);
+            let mut connection = database.pool.acquire().await.unwrap();
+            sqlx::query("PRAGMA foreign_keys = OFF")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO person_references VALUES ('orphan', 'missing', 'Person', 'known', NULL, 1)")
+                .execute(&mut *connection).await.unwrap();
+            sqlx::query("PRAGMA foreign_keys = ON")
+                .execute(&mut *connection)
+                .await
+                .unwrap();
+            drop(connection);
+            assert!(matches!(
+                repo.load_portable_user_data_snapshot().await,
+                Err(PersistenceError::DataInconsistent(_))
+            ));
+            sqlx::query("DELETE FROM person_references WHERE id = 'orphan'")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO self_subjects VALUES ('one', 'One', 1)")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            sqlx::query("INSERT INTO self_subjects VALUES ('two', 'Two', 2)")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            assert!(matches!(
+                repo.load_portable_user_data_snapshot().await,
+                Err(PersistenceError::SubjectInvariant(_))
+            ));
+            sqlx::query("DELETE FROM self_subjects WHERE id = 'two'")
+                .execute(&database.pool)
+                .await
+                .unwrap();
+            sqlx::raw_sql("INSERT INTO beliefs VALUES ('b', 'one', 3); INSERT INTO belief_revisions VALUES ('r2', 'b', 2, 'Later', NULL, NULL, 'UserUpdate', 4);")
+                .execute(&database.pool).await.unwrap();
+            assert!(matches!(
+                repo.load_portable_user_data_snapshot().await,
+                Err(PersistenceError::DataInconsistent(_))
+            ));
+            drop(repo);
             database.close().await;
         });
     }

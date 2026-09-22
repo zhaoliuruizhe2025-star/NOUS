@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LanguageSelector } from "../components/LanguageSelector";
 import { StructuredCapture } from "../components/StructuredCapture";
 import { StructuredHistory } from "../components/StructuredHistory";
+import { DataPortability } from "../components/DataPortability";
 import {
   getMessages,
   resolveInitialLocale,
@@ -11,7 +12,7 @@ import {
 import { initializeDatabase } from "./database";
 
 type DatabaseStatus = "initializing" | "ready" | "error";
-type AppView = "capture" | "history";
+type AppView = "capture" | "history" | "portability";
 
 export function App() {
   const [locale, setLocale] = useState<Locale>(() =>
@@ -73,11 +74,21 @@ export function App() {
             >
               {messages.navigation.history}
             </button>
+            <button
+              className={view === "portability" ? "view-switcher__active" : ""}
+              type="button"
+              aria-current={view === "portability" ? "page" : undefined}
+              onClick={() => setView("portability")}
+            >
+              {messages.navigation.portability}
+            </button>
           </nav>
           {view === "capture" ? (
             <StructuredCapture messages={messages} />
-          ) : (
+          ) : view === "history" ? (
             <StructuredHistory messages={messages} />
+          ) : (
+            <DataPortability messages={messages} />
           )}
         </>
       ) : (

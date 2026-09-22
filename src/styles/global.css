@@ -496,6 +496,30 @@ textarea {
   padding-left: 20px;
 }
 
+.portability-card {
+  max-width: 860px;
+  margin: 56px auto 0;
+  padding: 32px;
+  border-radius: 24px;
+  background: rgb(255 255 255 / 72%);
+}
+
+.portability-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.portability-actions > div {
+  padding: 20px;
+  border-radius: 18px;
+  background: rgb(238 241 236 / 80%);
+}
+
+.portability-actions h2 { margin-top: 0; }
+.portability-privacy { margin-top: 24px; color: #5d6a64; }
+
 @media (max-width: 560px) {
   .app-header {
     align-items: flex-start;

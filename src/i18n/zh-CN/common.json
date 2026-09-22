@@ -16,7 +16,8 @@
   "navigation": {
     "label": "记住功能视图",
     "capture": "记录",
-    "history": "已保存的记录"
+    "history": "已保存的记录",
+    "portability": "导出与备份"
   },
   "capture": {
     "eyebrow": "记住",
@@ -99,6 +100,29 @@
       "storageUnavailable": "本地存储尚未就绪，没有删除任何内容。",
       "deleteConflict": "删除与本地数据发生冲突，没有删除任何内容。",
       "deleteFailed": "未能删除这条记录，也没有保留部分删除结果。"
+    }
+  },
+  "portability": {
+    "eyebrow": "你的数据",
+    "title": "导出与备份",
+    "exportAction": "导出数据",
+    "exportExplanation": "将已保存的 NOUS 用户数据、关系与纠正来源保存为可移用的 JSON 文件。",
+    "backupAction": "创建数据库备份",
+    "backupExplanation": "为当前 NOUS 数据库创建一致的 SQLite 副本。当前尚不支持在应用内恢复备份。",
+    "privacy": "文件会保存在你选择的位置。NOUS 不会自动上传，也不会为文件额外添加 NOUS 专用加密。",
+    "workingExport": "正在创建导出文件……",
+    "workingBackup": "正在创建备份……",
+    "exportComplete": "数据已导出。",
+    "backupComplete": "数据库备份已创建。",
+    "errors": {
+      "subjectInvariant": "本地用户记录不一致，未创建导出文件。",
+      "dataInconsistent": "已保存的数据不一致，无法安全创建可移用的导出文件。",
+      "storageUnavailable": "本地存储尚未就绪。",
+      "serializationFailed": "无法准备可移用的数据。",
+      "destinationUnavailable": "无法安全地将文件写入此位置，请选择其他位置。",
+      "destinationExists": "该位置已有文件，请选择其他文件名或位置。",
+      "exportFailed": "未能创建导出文件。",
+      "backupFailed": "未能创建数据库备份。"
     }
   },
   "correction": {
