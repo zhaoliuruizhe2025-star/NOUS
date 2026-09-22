@@ -58,7 +58,8 @@ describe("structured history inspect boundary", () => {
     expect(api).not.toContain("createdAt");
     expect(api).not.toMatch(/invoke<StructuredHistory>\([^)]*,\s*\{/);
     expect(component.match(/loadStructuredHistory\(/g)).toHaveLength(1);
-    expect(component).not.toMatch(/\b(?:save|edit|delete|promote)\w*\s*\(/i);
+    expect(component).not.toMatch(/\b(?:save|edit|promote)\w*\s*\(/i);
+    expect(component).toContain("<StructuredDeletion");
   });
 
   it("presents only repository-assembled relationships and hides opaque metadata", () => {

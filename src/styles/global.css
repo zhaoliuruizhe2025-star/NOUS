@@ -423,6 +423,39 @@ textarea {
   margin: 8px 0 12px;
 }
 
+.deletion-open {
+  color: #8b4f49;
+  margin-left: 12px;
+}
+
+.deletion-confirmation {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.deletion-confirmation blockquote {
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 3px solid #ad6d64;
+  overflow-wrap: anywhere;
+}
+
+.danger-button {
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 16px;
+  background: #8b4f49;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .correction-provenance {
   margin: 8px 0;
   color: #5d6a64;

@@ -82,6 +82,25 @@
       "loadFailed": "无法加载已保存的记录。"
     }
   },
+  "deletion": {
+    "open": "删除记录",
+    "title": "永久删除这条记录？",
+    "consequence": "删除这条记录也会从当前 NOUS 数据库中移除它的纠正历史。当前版本无法撤销此操作。",
+    "cancel": "取消",
+    "confirm": "永久删除",
+    "deleting": "正在删除……",
+    "reload": "重新加载已保存记录",
+    "errors": {
+      "targetNotFound": "找不到这条记录，没有删除任何内容。",
+      "staleDelete": "打开后这条记录发生了变化，请重新加载并检查后再删除。",
+      "dependencyBlocked": "这条记录仍被其他已保存的 NOUS 数据使用，目前无法安全删除。",
+      "subjectInvariant": "本地用户记录不一致，没有删除任何内容。",
+      "dataInconsistent": "已保存的数据不一致，没有删除任何内容。",
+      "storageUnavailable": "本地存储尚未就绪，没有删除任何内容。",
+      "deleteConflict": "删除与本地数据发生冲突，没有删除任何内容。",
+      "deleteFailed": "未能删除这条记录，也没有保留部分删除结果。"
+    }
+  },
   "correction": {
     "open": "纠正不准确的记录",
     "title": "纠正不准确的记录",

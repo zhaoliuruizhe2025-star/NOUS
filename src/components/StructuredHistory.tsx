@@ -10,11 +10,13 @@ import {
   type StructuredHistoryObservation,
 } from "../app/history";
 import { StructuredCorrection, type CorrectableRecord } from "./StructuredCorrection";
+import { StructuredDeletion } from "./StructuredDeletion";
 
-function RecordActions({ selected, messages, onCorrect }: {
+function RecordActions({ selected, messages, onCorrect, onDelete }: {
   selected: CorrectableRecord;
   messages: Messages;
   onCorrect: (record: CorrectableRecord) => void;
+  onDelete: (record: CorrectableRecord) => void;
 }) {
   const copy = messages.correction;
   return (
@@ -50,17 +52,19 @@ function RecordActions({ selected, messages, onCorrect }: {
               </li>)}</ol>
       </details>}
       <button type="button" className="text-button" onClick={() => onCorrect(selected)}>{copy.open}</button>
+      <button type="button" className="text-button deletion-open" onClick={() => onDelete(selected)}>{messages.deletion.open}</button>
     </div>
   );
 }
 
-function ObservationItem({ observation, contextId, messages, onCorrect }: {
+function ObservationItem({ observation, contextId, messages, onCorrect, onDelete }: {
   observation: StructuredHistoryObservation;
   contextId: string | null;
   messages: Messages;
   onCorrect: (record: CorrectableRecord) => void;
+  onDelete: (record: CorrectableRecord) => void;
 }) {
-  return <li><p>{observation.content}</p><RecordActions selected={{ kind: "observation", record: observation, contextId }} messages={messages} onCorrect={onCorrect} /></li>;
+  return <li><p>{observation.content}</p><RecordActions selected={{ kind: "observation", record: observation, contextId }} messages={messages} onCorrect={onCorrect} onDelete={onDelete} /></li>;
 }
 
 type HistoryState =
@@ -80,11 +84,13 @@ function ThoughtItem({
   contextId,
   messages,
   onCorrect,
+  onDelete,
 }: {
   thought: StructuredHistoryThought;
   contextId: string | null;
   messages: Messages;
   onCorrect: (record: CorrectableRecord) => void;
+  onDelete: (record: CorrectableRecord) => void;
 }) {
   return (
     <li>
@@ -97,7 +103,7 @@ function ThoughtItem({
           )}
         </small>
       )}
-      <RecordActions selected={{ kind: "thought", record: thought, contextId }} messages={messages} onCorrect={onCorrect} />
+      <RecordActions selected={{ kind: "thought", record: thought, contextId }} messages={messages} onCorrect={onCorrect} onDelete={onDelete} />
     </li>
   );
 }
@@ -107,9 +113,11 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
   const [state, setState] = useState<HistoryState>({ status: "loading" });
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [selected, setSelected] = useState<CorrectableRecord | null>(null);
+  const [deleteSelected, setDeleteSelected] = useState<CorrectableRecord | null>(null);
 
   function reload() {
     setSelected(null);
+    setDeleteSelected(null);
     setState({ status: "loading" });
     setLoadAttempt((attempt) => attempt + 1);
   }
@@ -155,7 +163,7 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
         </div>
       )}
 
-      {state.status === "loaded" && selected && (
+      {state.status === "loaded" && selected && !deleteSelected && (
         <StructuredCorrection
           key={`${selected.kind}:${selected.record.id}:${selected.record.stateToken}`}
           selected={selected}
@@ -167,11 +175,22 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
         />
       )}
 
-      {state.status === "loaded" && !selected && isStructuredHistoryEmpty(state.history) && (
+      {state.status === "loaded" && deleteSelected && !selected && (
+        <StructuredDeletion
+          key={`${deleteSelected.kind}:${deleteSelected.record.id}:${deleteSelected.record.stateToken}`}
+          selected={deleteSelected}
+          messages={messages}
+          onCancel={() => setDeleteSelected(null)}
+          onStale={reload}
+          onDeleted={(history) => { setState({ status: "loaded", history }); setDeleteSelected(null); }}
+        />
+      )}
+
+      {state.status === "loaded" && !selected && !deleteSelected && isStructuredHistoryEmpty(state.history) && (
         <p className="history-empty">{copy.empty}</p>
       )}
 
-      {state.status === "loaded" && !selected && !isStructuredHistoryEmpty(state.history) && (
+      {state.status === "loaded" && !selected && !deleteSelected && !isStructuredHistoryEmpty(state.history) && (
         <div className="history-records">
           {state.history.contexts.length > 0 && (
             <section aria-labelledby="history-contexts-title">
@@ -180,13 +199,13 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
                 {state.history.contexts.map((context) => (
                   <article className="history-context" key={context.id}>
                     <h3>{context.description}</h3>
-                    <RecordActions selected={{ kind: "situation", record: context }} messages={messages} onCorrect={setSelected} />
+                    <RecordActions selected={{ kind: "situation", record: context }} messages={messages} onCorrect={setSelected} onDelete={setDeleteSelected} />
                     {context.observations.length > 0 && (
                       <section>
                         <h4>{copy.observations}</h4>
                         <ul>
                           {context.observations.map((observation) => (
-                            <ObservationItem key={observation.id} observation={observation} contextId={context.id} messages={messages} onCorrect={setSelected} />
+                            <ObservationItem key={observation.id} observation={observation} contextId={context.id} messages={messages} onCorrect={setSelected} onDelete={setDeleteSelected} />
                           ))}
                         </ul>
                       </section>
@@ -202,6 +221,7 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
                               contextId={context.id}
                               messages={messages}
                               onCorrect={setSelected}
+                              onDelete={setDeleteSelected}
                             />
                           ))}
                         </ul>
@@ -218,7 +238,7 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
               <h2>{copy.standaloneObservations}</h2>
               <ul>
                 {state.history.standaloneObservations.map((observation) => (
-                  <ObservationItem key={observation.id} observation={observation} contextId={null} messages={messages} onCorrect={setSelected} />
+                  <ObservationItem key={observation.id} observation={observation} contextId={null} messages={messages} onCorrect={setSelected} onDelete={setDeleteSelected} />
                 ))}
               </ul>
             </section>
@@ -235,6 +255,7 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
                     contextId={null}
                     messages={messages}
                     onCorrect={setSelected}
+                    onDelete={setDeleteSelected}
                   />
                 ))}
               </ul>

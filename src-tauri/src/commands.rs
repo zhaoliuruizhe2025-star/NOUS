@@ -6,11 +6,12 @@ use tauri::State;
 use crate::{
     application::{
         correct_structured_record as correct_structured_record_workflow,
+        delete_structured_record as delete_structured_record_workflow,
         load_structured_history as load_structured_history_workflow,
         save_structured_capture as save_structured_capture_workflow, CorrectionInput,
-        ObservationCaptureInput, SaveStructuredCaptureInput, SavedStructuredCapture,
+        DeletionInput, ObservationCaptureInput, SaveStructuredCaptureInput, SavedStructuredCapture,
         SituationCaptureInput, StructuredCaptureError, StructuredCorrectionError,
-        StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
+        StructuredDeletionError, StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
     },
     persistence::{PersistenceError, SharedSqlitePool, SqliteSelfModelRepository},
 };
@@ -240,6 +241,34 @@ pub(crate) struct StructuredCorrectionCommandError {
     code: &'static str,
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(
+    tag = "recordType",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum DeleteStructuredRecordRequest {
+    Situation {
+        target_id: String,
+        expected_state_token: String,
+    },
+    Observation {
+        target_id: String,
+        expected_state_token: String,
+    },
+    Thought {
+        target_id: String,
+        expected_state_token: String,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredDeletionCommandError {
+    code: &'static str,
+}
+
 /// Reports readiness for the one database managed and migrated by the SQL plugin.
 ///
 /// The command deliberately accepts no caller-selected SQL, table, path, or operation.
@@ -289,6 +318,72 @@ pub(crate) async fn correct_structured_record(
         .await
         .map_err(map_correction_error)?;
     Ok(result.into())
+}
+
+#[tauri::command]
+pub(crate) async fn delete_structured_record(
+    database: State<'_, SharedSqlitePool>,
+    request: DeleteStructuredRecordRequest,
+) -> Result<StructuredHistoryResponse, StructuredDeletionCommandError> {
+    let repository = SqliteSelfModelRepository::new(database.inner().clone());
+    let result = delete_structured_record_workflow(&repository, request.into())
+        .await
+        .map_err(map_deletion_error)?;
+    Ok(result.into())
+}
+
+fn map_deletion_error(error: StructuredDeletionError) -> StructuredDeletionCommandError {
+    let code = match error {
+        StructuredDeletionError::InvalidTarget
+        | StructuredDeletionError::Persistence(PersistenceError::NotFound { .. }) => {
+            "targetNotFound"
+        }
+        StructuredDeletionError::Persistence(PersistenceError::StaleDelete) => "staleDelete",
+        StructuredDeletionError::Persistence(PersistenceError::DependencyBlocked) => {
+            "dependencyBlocked"
+        }
+        StructuredDeletionError::Persistence(PersistenceError::SubjectInvariant(_)) => {
+            "subjectInvariant"
+        }
+        StructuredDeletionError::Persistence(PersistenceError::DataInconsistent(_))
+        | StructuredDeletionError::Persistence(PersistenceError::DomainReconstruction { .. })
+        | StructuredDeletionError::History(_) => "dataInconsistent",
+        StructuredDeletionError::Persistence(PersistenceError::NotReady(_)) => "storageUnavailable",
+        StructuredDeletionError::Persistence(PersistenceError::DeleteConflict(_))
+        | StructuredDeletionError::Persistence(PersistenceError::ConstraintViolation { .. }) => {
+            "deleteConflict"
+        }
+        StructuredDeletionError::Persistence(_) => "deleteFailed",
+    };
+    StructuredDeletionCommandError { code }
+}
+
+impl From<DeleteStructuredRecordRequest> for DeletionInput {
+    fn from(request: DeleteStructuredRecordRequest) -> Self {
+        match request {
+            DeleteStructuredRecordRequest::Situation {
+                target_id,
+                expected_state_token,
+            } => Self::Situation {
+                target_id,
+                expected_state_token,
+            },
+            DeleteStructuredRecordRequest::Observation {
+                target_id,
+                expected_state_token,
+            } => Self::Observation {
+                target_id,
+                expected_state_token,
+            },
+            DeleteStructuredRecordRequest::Thought {
+                target_id,
+                expected_state_token,
+            } => Self::Thought {
+                target_id,
+                expected_state_token,
+            },
+        }
+    }
 }
 
 fn map_correction_error(error: StructuredCorrectionError) -> StructuredCorrectionCommandError {
@@ -694,9 +789,10 @@ fn status_for_schema_version(schema_version: Option<&str>) -> Result<DatabaseSta
 #[cfg(test)]
 mod tests {
     use super::{
-        database_status_for_pool, map_capture_error, map_correction_error, map_history_error,
-        status_for_schema_version, CorrectStructuredRecordRequest, DatabaseStatus,
-        SaveStructuredCaptureRequest, StructuredCaptureError, StructuredCorrectionError,
+        database_status_for_pool, map_capture_error, map_correction_error, map_deletion_error,
+        map_history_error, status_for_schema_version, CorrectStructuredRecordRequest,
+        DatabaseStatus, DeleteStructuredRecordRequest, SaveStructuredCaptureRequest,
+        StructuredCaptureError, StructuredCorrectionError, StructuredDeletionError,
         StructuredHistoryCommandError, StructuredHistoryError, READINESS_ERROR,
     };
     use crate::persistence::{PersistenceError, SharedSqlitePool};
@@ -831,6 +927,65 @@ mod tests {
         ] {
             let mapped = map_correction_error(error);
             assert_eq!(mapped.code, code);
+            let serialized = serde_json::to_string(&mapped).unwrap();
+            assert!(!serialized.contains("SQL"));
+            assert!(!serialized.contains("raw row"));
+            assert!(!serialized.contains("path"));
+        }
+    }
+
+    #[test]
+    fn deletion_request_is_typed_and_rejects_caller_authority() {
+        for kind in ["situation", "observation", "thought"] {
+            let valid = serde_json::json!({"recordType":kind,"targetId":"target","expectedStateToken":"initial:situation:target"});
+            assert!(serde_json::from_value::<DeleteStructuredRecordRequest>(valid.clone()).is_ok());
+            for field in [
+                "subjectId",
+                "correctionId",
+                "cascade",
+                "detach",
+                "createdAtMs",
+                "sql",
+                "deleteScope",
+                "situationId",
+            ] {
+                let mut invalid = valid.clone();
+                invalid
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(field.into(), serde_json::json!("forbidden"));
+                assert!(
+                    serde_json::from_value::<DeleteStructuredRecordRequest>(invalid).is_err(),
+                    "accepted {field}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn deletion_errors_expose_only_safe_codes() {
+        for (error, expected) in [
+            (PersistenceError::StaleDelete, "staleDelete"),
+            (PersistenceError::DependencyBlocked, "dependencyBlocked"),
+            (
+                PersistenceError::SubjectInvariant("private".into()),
+                "subjectInvariant",
+            ),
+            (
+                PersistenceError::DataInconsistent("raw row".into()),
+                "dataInconsistent",
+            ),
+            (
+                PersistenceError::DeleteConflict("SQL constraint".into()),
+                "deleteConflict",
+            ),
+            (
+                PersistenceError::Storage("database path".into()),
+                "deleteFailed",
+            ),
+        ] {
+            let mapped = map_deletion_error(StructuredDeletionError::Persistence(error));
+            assert_eq!(mapped.code, expected);
             let serialized = serde_json::to_string(&mapped).unwrap();
             assert!(!serialized.contains("SQL"));
             assert!(!serialized.contains("raw row"));

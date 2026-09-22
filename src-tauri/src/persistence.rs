@@ -177,6 +177,9 @@ pub(crate) enum PersistenceError {
     StaleCorrection,
     EvidenceReferenceBlocked,
     CorrectionConflict(String),
+    StaleDelete,
+    DependencyBlocked,
+    DeleteConflict(String),
 }
 
 impl fmt::Display for PersistenceError {
@@ -212,6 +215,9 @@ impl fmt::Display for PersistenceError {
             Self::CorrectionConflict(detail) => {
                 write!(formatter, "correction conflict: {detail}")
             }
+            Self::StaleDelete => write!(formatter, "the delete is based on stale state"),
+            Self::DependencyBlocked => write!(formatter, "the record has an external reference"),
+            Self::DeleteConflict(detail) => write!(formatter, "delete conflict: {detail}"),
         }
     }
 }
@@ -373,6 +379,22 @@ pub(crate) enum StructuredCorrectionInput {
         situation_id: Option<crate::domain::SituationId>,
         confidence: Option<crate::domain::ThoughtConfidence>,
         user_note: Option<String>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum StructuredDeletionInput {
+    Situation {
+        target_id: crate::domain::SituationId,
+        expected_state_token: String,
+    },
+    Observation {
+        target_id: crate::domain::ObservationId,
+        expected_state_token: String,
+    },
+    Thought {
+        target_id: crate::domain::ThoughtId,
+        expected_state_token: String,
     },
 }
 
@@ -1076,6 +1098,141 @@ impl SqliteSelfModelRepository {
                 }
             }
 
+            load_structured_history_snapshot(&mut transaction).await
+        }
+        .await;
+
+        match result {
+            Ok(records) => {
+                transaction.commit().await.map_err(PersistenceError::from)?;
+                Ok(records)
+            }
+            Err(error) => {
+                transaction
+                    .rollback()
+                    .await
+                    .map_err(PersistenceError::from)?;
+                Err(error)
+            }
+        }
+    }
+
+    /// Deletes one current inspect record and its own correction provenance in one snapshot.
+    pub(crate) async fn delete_structured_record_atomic(
+        &self,
+        deletion: StructuredDeletionInput,
+    ) -> Result<StructuredHistoryRecords, PersistenceError> {
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let mut transaction = (**connection.connection())
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(PersistenceError::from)?;
+
+        let result = async {
+            let records = load_structured_history_snapshot(&mut transaction).await?;
+            let (kind, target_id, subject_id, correction_count, current_token) = match &deletion {
+                StructuredDeletionInput::Situation { target_id, .. } => {
+                    let record = records
+                        .situations
+                        .iter()
+                        .find(|item| item.value.id() == target_id)
+                        .ok_or_else(|| PersistenceError::NotFound {
+                            entity: "Situation",
+                            id: target_id.as_str().to_owned(),
+                        })?;
+                    (
+                        "situation",
+                        target_id.as_str(),
+                        record.value.subject_id().as_str(),
+                        record.corrections.len(),
+                        record.state_token.as_str(),
+                    )
+                }
+                StructuredDeletionInput::Observation { target_id, .. } => {
+                    let record = records
+                        .observations
+                        .iter()
+                        .find(|item| item.value.id() == target_id)
+                        .ok_or_else(|| PersistenceError::NotFound {
+                            entity: "Observation",
+                            id: target_id.as_str().to_owned(),
+                        })?;
+                    (
+                        "observation",
+                        target_id.as_str(),
+                        record.value.subject_id().as_str(),
+                        record.corrections.len(),
+                        record.state_token.as_str(),
+                    )
+                }
+                StructuredDeletionInput::Thought { target_id, .. } => {
+                    let record = records
+                        .thoughts
+                        .iter()
+                        .find(|item| item.value.id() == target_id)
+                        .ok_or_else(|| PersistenceError::NotFound {
+                            entity: "Thought",
+                            id: target_id.as_str().to_owned(),
+                        })?;
+                    (
+                        "thought",
+                        target_id.as_str(),
+                        record.value.subject_id().as_str(),
+                        record.corrections.len(),
+                        record.state_token.as_str(),
+                    )
+                }
+            };
+            let expected_token = match &deletion {
+                StructuredDeletionInput::Situation {
+                    expected_state_token,
+                    ..
+                }
+                | StructuredDeletionInput::Observation {
+                    expected_state_token,
+                    ..
+                }
+                | StructuredDeletionInput::Thought {
+                    expected_state_token,
+                    ..
+                } => expected_state_token,
+            };
+            if expected_token != current_token {
+                return Err(PersistenceError::StaleDelete);
+            }
+
+            ensure_no_delete_dependencies(&mut transaction, kind, target_id, subject_id).await?;
+
+            let (audit_table, target_column, entity_table) = match kind {
+                "situation" => ("situation_corrections", "situation_id", "situations"),
+                "observation" => ("observation_corrections", "observation_id", "observations"),
+                _ => ("thought_corrections", "thought_id", "thoughts"),
+            };
+            let audit_deleted = sqlx::query(&format!(
+                "DELETE FROM {audit_table} WHERE {target_column} = ?"
+            ))
+            .bind(target_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(delete_write_error)?;
+            if audit_deleted.rows_affected() != correction_count as u64 {
+                return Err(PersistenceError::DeleteConflict(
+                    "target correction count changed".into(),
+                ));
+            }
+            let entity_deleted = sqlx::query(&format!(
+                "DELETE FROM {entity_table} WHERE id = ? AND subject_id = ?"
+            ))
+            .bind(target_id)
+            .bind(subject_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(delete_write_error)?;
+            if entity_deleted.rows_affected() != 1 {
+                return Err(PersistenceError::DeleteConflict(
+                    "target delete did not affect one row".into(),
+                ));
+            }
             load_structured_history_snapshot(&mut transaction).await
         }
         .await;
@@ -2168,6 +2325,194 @@ fn correction_write_error(operation: &'static str, error: sqlx::Error) -> Persis
         PersistenceError::CorrectionConflict(format!("constraint conflict during {operation}"))
     } else {
         PersistenceError::from(error)
+    }
+}
+
+fn delete_write_error(error: sqlx::Error) -> PersistenceError {
+    if matches!(
+        error.as_database_error().map(|value| value.kind()),
+        Some(ErrorKind::ForeignKeyViolation | ErrorKind::CheckViolation)
+    ) {
+        PersistenceError::DeleteConflict(
+            "a concurrent reference or constraint blocked deletion".into(),
+        )
+    } else {
+        PersistenceError::from(error)
+    }
+}
+
+fn inconsistent_delete_reference() -> PersistenceError {
+    PersistenceError::DataInconsistent("an exact-target dependency is inconsistent".into())
+}
+
+async fn check_exact_reference_subjects(
+    transaction: &mut Transaction<'_, Sqlite>,
+    table: &'static str,
+    column: &'static str,
+    target_id: &str,
+    subject_id: &str,
+) -> Result<bool, PersistenceError> {
+    // All table and column names are fixed call-site constants; no caller SQL reaches this query.
+    let query = format!("SELECT subject_id FROM {table} WHERE {column} = ?");
+    let rows: Vec<(String,)> = sqlx::query_as(&query)
+        .bind(target_id)
+        .fetch_all(&mut **transaction)
+        .await
+        .map_err(|_| inconsistent_delete_reference())?;
+    if rows.iter().any(|(owner,)| owner != subject_id) {
+        return Err(inconsistent_delete_reference());
+    }
+    Ok(!rows.is_empty())
+}
+
+async fn ensure_no_delete_dependencies(
+    transaction: &mut Transaction<'_, Sqlite>,
+    kind: &str,
+    target_id: &str,
+    subject_id: &str,
+) -> Result<(), PersistenceError> {
+    let mut blocked = false;
+    if kind == "situation" {
+        // Current Observation/Thought and all correction rows have already been fully
+        // reconstructed by the pre-delete Task 008/009 snapshot on this transaction.
+        for (table, column) in [
+            ("observations", "situation_id"),
+            ("thoughts", "situation_id"),
+            ("observation_corrections", "before_situation_id"),
+            ("observation_corrections", "after_situation_id"),
+            ("thought_corrections", "before_situation_id"),
+            ("thought_corrections", "after_situation_id"),
+        ] {
+            blocked |=
+                check_exact_reference_subjects(transaction, table, column, target_id, subject_id)
+                    .await?;
+        }
+
+        let emotions: Vec<(String, String, Option<String>, String, i64, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, situation_id, label, intensity, created_at_ms FROM emotions WHERE situation_id = ?",
+        ).bind(target_id).fetch_all(&mut **transaction).await.map_err(|_| inconsistent_delete_reference())?;
+        for (id, owner, situation_id, label, intensity, created_at_ms) in emotions {
+            if created_at_ms < 0 {
+                return Err(inconsistent_delete_reference());
+            }
+            let value: crate::domain::Emotion = EmotionRow {
+                id,
+                subject_id: owner,
+                situation_id,
+                label,
+                intensity,
+                created_at_ms,
+            }
+            .try_into()
+            .map_err(|_| inconsistent_delete_reference())?;
+            if value.subject_id().as_str() != subject_id
+                || value
+                    .situation_id()
+                    .is_none_or(|id| id.as_str() != target_id)
+            {
+                return Err(inconsistent_delete_reference());
+            }
+            blocked = true;
+        }
+        let memories: Vec<MemoryDatabaseRow> = sqlx::query_as(
+            "SELECT id, subject_id, situation_id, description, user_meaning, created_at_ms FROM memories WHERE situation_id = ?",
+        ).bind(target_id).fetch_all(&mut **transaction).await.map_err(|_| inconsistent_delete_reference())?;
+        for (id, owner, situation_id, description, user_meaning, created_at_ms) in memories {
+            if created_at_ms < 0 {
+                return Err(inconsistent_delete_reference());
+            }
+            let value: crate::domain::Memory = MemoryRow {
+                id,
+                subject_id: owner,
+                situation_id,
+                description,
+                user_meaning,
+                created_at_ms,
+            }
+            .try_into()
+            .map_err(|_| inconsistent_delete_reference())?;
+            if value.subject_id().as_str() != subject_id
+                || value
+                    .situation_id()
+                    .is_none_or(|id| id.as_str() != target_id)
+            {
+                return Err(inconsistent_delete_reference());
+            }
+            blocked = true;
+        }
+        let decisions: Vec<(String, String, Option<String>, String, i64)> = sqlx::query_as(
+            "SELECT id, subject_id, situation_id, description, created_at_ms FROM decisions WHERE situation_id = ?",
+        ).bind(target_id).fetch_all(&mut **transaction).await.map_err(|_| inconsistent_delete_reference())?;
+        for (id, owner, situation_id, description, created_at_ms) in decisions {
+            if created_at_ms < 0 {
+                return Err(inconsistent_delete_reference());
+            }
+            let value: crate::domain::Decision = DecisionRow {
+                id,
+                subject_id: owner,
+                situation_id,
+                description,
+                created_at_ms,
+            }
+            .try_into()
+            .map_err(|_| inconsistent_delete_reference())?;
+            if value.subject_id().as_str() != subject_id
+                || value
+                    .situation_id()
+                    .is_none_or(|id| id.as_str() != target_id)
+            {
+                return Err(inconsistent_delete_reference());
+            }
+            blocked = true;
+        }
+    }
+
+    let (source_column, source_kind) = match kind {
+        "situation" => ("source_situation_id", "Situation"),
+        "observation" => ("source_observation_id", "Observation"),
+        _ => ("source_thought_id", "Thought"),
+    };
+    let query = format!(
+        "SELECT id, subject_id, relationship_kind, provenance, source_kind,
+        source_observation_id, source_thought_id, source_emotion_id, source_situation_id,
+        source_memory_id, source_decision_id, source_outcome_id, target_kind, target_belief_id,
+        target_belief_revision_id, target_value_id, target_value_revision_id, user_note,
+        created_at_ms FROM evidence_links WHERE {source_column} = ?"
+    );
+    let evidence: Vec<EvidenceLinkRow> = sqlx::query_as(&query)
+        .bind(target_id)
+        .fetch_all(&mut **transaction)
+        .await
+        .map_err(|_| inconsistent_delete_reference())?;
+    for row in evidence {
+        if row.subject_id != subject_id || row.source_kind != source_kind || row.created_at_ms < 0 {
+            return Err(inconsistent_delete_reference());
+        }
+        let value: crate::domain::EvidenceLink = row
+            .try_into()
+            .map_err(|_| inconsistent_delete_reference())?;
+        if value.subject_id().as_str() != subject_id {
+            return Err(inconsistent_delete_reference());
+        }
+        let target_owner: Option<String> = match value.target() {
+            crate::domain::EvidenceTarget::BeliefRevision { belief_id, revision_id } =>
+                sqlx::query_scalar("SELECT beliefs.subject_id FROM belief_revisions JOIN beliefs ON beliefs.id = belief_revisions.belief_id WHERE belief_revisions.id = ? AND belief_revisions.belief_id = ?")
+                    .bind(revision_id.as_str()).bind(belief_id.as_str())
+                    .fetch_optional(&mut **transaction).await.map_err(|_| inconsistent_delete_reference())?,
+            crate::domain::EvidenceTarget::ValueRevision { value_id, revision_id } =>
+                sqlx::query_scalar("SELECT \"values\".subject_id FROM value_revisions JOIN \"values\" ON \"values\".id = value_revisions.value_id WHERE value_revisions.id = ? AND value_revisions.value_id = ?")
+                    .bind(revision_id.as_str()).bind(value_id.as_str())
+                    .fetch_optional(&mut **transaction).await.map_err(|_| inconsistent_delete_reference())?,
+        };
+        if target_owner.as_deref() != Some(subject_id) {
+            return Err(inconsistent_delete_reference());
+        }
+        blocked = true;
+    }
+    if blocked {
+        Err(PersistenceError::DependencyBlocked)
+    } else {
+        Ok(())
     }
 }
 
