@@ -53,8 +53,9 @@ The type, provenance, context, and time of a premise constrain what may follow f
 | Memory | Retrospectively selected experience and any user-authored meaning | Recollection is not verified chronology; NOUS must not invent the user's meaning. |
 | Decision | A choice the user reports actually making | Considering an option is not a Decision. |
 | Outcome | What the user reports later happened following a Decision | Sequence is not causal proof, and Outcome quality does not establish Decision quality. |
-| Candidate/Hypothesis | A traceable, unconfirmed system interpretation | Candidate/Hypothesis != confirmed user knowledge, even when well-supported. |
-| Pattern | A recurring structure under relevant conditions | Pattern != personality essence, diagnosis, or immutable identity. |
+| Candidate | A reviewable, falsifiable possible recurring structure, proposed by NOUS or the user with proposer provenance | Candidate != confirmed user knowledge, even when well-supported; the first implementation slice is transient and user-initiated. |
+| Hypothesis | A possible explanatory proposition considered during modeling and validation | A reasoning role, not a separate durable entity or a causal fact; a concrete reviewable claim is represented as a Candidate. |
+| Pattern | A recurring, evidence-grounded structure with bounded context and time, validated and explicitly accepted by the user for durable Self Model use | Pattern != personality essence, diagnosis, immutable trait, objective truth, or automatic present certainty. |
 | Current temporary interpretation | A working understanding used for the present interaction | Current temporary inference != durable Self Model knowledge. |
 | Concrete historical record | Attributed information about a past experience or representation | Historical record != permanent present-state truth; preserved error history is not proof the error was once true. |
 | System interpretation | A claim NOUS derived from identified premises | Keep it distinct from user reports and confirmed knowledge, with its actual basis and limitations. |
@@ -77,6 +78,14 @@ Important Pattern, Candidate, and Hypothesis interpretations must eventually be 
 - what kind of future evidence could weaken or change it.
 
 These are semantic requirements for future Phase C design, not mandatory database columns, a final schema, or a fixed lifecycle enum. Unknown or unavailable information must remain unknown rather than be manufactured to fill a structure.
+
+### Task 012 approved Connect architecture
+
+[TASK_012_DESIGN.md](TASK_012_DESIGN.md) records the approved Candidate, Hypothesis, and Pattern meanings and the separate Task 013 boundary. Evidence assessment, user acceptance, and present applicability are independent dimensions; qualitative evidence strength never silently promotes a Candidate. A durable Pattern requires both Model Validation and the user's explicit acceptance of its claim and scope. Acceptance does not make the claim objectively true. Task 013's first slice has user-initiated, transient Candidates only; no durable Candidate, Hypothesis, or Pattern is created.
+
+Task 006 `EvidenceLink` remains a `UserAuthored` assertion from a typed source to an exact BeliefRevision or ValueRevision. It is not derived Pattern provenance. Any future durable derived interpretation needs separately designed typed provenance and a complete inspect, correction, change, deletion, export, and backup lifecycle. In a review, distinguish a logical source ID from the exact representation used: Situation, Observation, and Thought have current state tokens; Belief and Value evidence uses exact revision identity. Correction or deletion of a source invalidates an affected prior evaluation until revalidation. Neither superseded inaccurate content nor deleted content may continue as active evidence or be retained in a derived artifact to keep a claim alive.
+
+Context and analysis scope, unknown semantic time, material counterevidence, alternative explanations, and possible dependence among records must stay explicit. Storage time alone cannot establish event time, recency, change, or current applicability. Record count is not evidence independence or system confidence; recurrence or co-occurrence does not establish cause. No numeric Pattern/Candidate confidence, weight, probability, or score is authorized. `ThoughtConfidence` remains the user's subjective conviction in a Thought at that time.
 
 Validation must keep an interpretation proportionate to the relevant evidence and open to challenge. A long-lived candidate must remain distinct from canonical user knowledge, inspectable, explainable, and correctable. Stability does not make it an immutable hidden psychological profile. Neither model validation nor user disagreement gives NOUS authority over the user's identity.
 

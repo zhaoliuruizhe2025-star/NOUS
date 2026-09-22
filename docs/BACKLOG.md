@@ -17,7 +17,7 @@ These outcomes are on the path from the current foundation to Private Beta:
 - Task 005 Memory, Decision, and Outcome;
 - Task 006 Evidence foundation and explicit relationships;
 - basic Remember workflows;
-- Phase C explicit connections, evidence-grounded Pattern/Candidate reasoning, model validation, counterevidence, context/time scope, and faithful reasoning traces under `docs/REASONING_MODEL.md`;
+- Phase C explicit connections, evidence-grounded Pattern/Candidate reasoning, model validation, counterevidence, context/time scope, and faithful reasoning traces under `docs/REASONING_MODEL.md` and the approved `docs/TASK_012_DESIGN.md`; its first Task 013 candidate-review slice remains separately scoped and unimplemented;
 - Phase D response alignment, relevant Self Model selection, requested advice from validated reasoning, explainability, adaptive interaction, and bilingual semantic consistency under `docs/REASONING_MODEL.md`;
 - Mirror, correction, and evidence views;
 - Product Experience / UI-UX work that replaces the Task 001 scaffold before beta;
@@ -62,7 +62,7 @@ See `docs/RELATIONSHIP_LENS.md` and `docs/EXPRESSION_LAB.md` for feature boundar
 Research items require evidence and may never become product features:
 
 - evaluation methods for “second perspective” usefulness;
-- calibration of pattern and prediction confidence;
+- qualitative calibration of Pattern claims and research into prediction uncertainty, without a numeric Pattern/Candidate confidence score;
 - measuring when reflection feels helpful, obvious, intrusive, or overly deep;
 - transparent multi-framework disagreement;
 - methods for distinguishing stable patterns from temporary state;
