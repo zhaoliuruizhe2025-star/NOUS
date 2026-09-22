@@ -14,10 +14,11 @@
     "error": "Local storage could not be initialized"
   },
   "navigation": {
-    "label": "Remember views",
+    "label": "NOUS views",
     "capture": "Capture",
     "history": "Saved records",
-    "portability": "Export and backup"
+    "portability": "Export and backup",
+    "candidate": "Candidate review"
   },
   "capture": {
     "eyebrow": "Remember",
@@ -81,6 +82,71 @@
       "dataInconsistent": "Some saved records are inconsistent, so this view could not be loaded safely.",
       "storageUnavailable": "Local storage is not ready.",
       "loadFailed": "Saved records could not be loaded."
+    }
+  },
+  "candidateReview": {
+    "eyebrow": "Connect · Transient review",
+    "title": "Candidate review",
+    "intro": "Examine a possible recurring structure using only the saved records you choose. Your wording and evidence roles are your own; NOUS does not decide whether a Pattern exists here.",
+    "notSaved": "This review is not saved. Leaving this view or reloading the app discards it.",
+    "candidateLabel": "Candidate wording",
+    "candidatePlaceholder": "Describe a specific, reviewable possibility…",
+    "wordingGuidance": "Keep the claim about your own experience and its context. For example, ‘In these team projects, I tended to withdraw after conflict’ is narrower than a label about who you are. This guidance does not change your wording.",
+    "claimScopeLabel": "Claim scope",
+    "claimScopePlaceholder": "Which situations or conditions might this claim apply to?",
+    "scopeGuidance": "The claim scope is what you write here. The analysis scope below is only the records selected for this review; those records do not automatically support a broader claim.",
+    "sourcesTitle": "Choose saved records",
+    "roleMeaning": "You may assign one role to each selected record, or leave it unclassified. These are your classifications, not proof or a score.",
+    "loading": "Loading current saved records…",
+    "retry": "Try again",
+    "noSources": "No saved situations, experienced details, or thoughts are available to review yet.",
+    "situationHeading": "Situation",
+    "situationDualRole": "This situation can be selected as a source itself. For linked records below, it also supplies context; they do not automatically represent separate experiences.",
+    "observationHeading": "Linked experienced details",
+    "thoughtHeading": "Linked thoughts",
+    "standaloneObservations": "Experienced details without a linked situation",
+    "standaloneThoughts": "Thoughts without a linked situation",
+    "sourceTypes": {
+      "situation": "Situation",
+      "observation": "Experienced detail",
+      "thought": "Thought"
+    },
+    "selectSource": "Select record",
+    "deselectSource": "Deselect record",
+    "linkedContext": "Linked situation context",
+    "subjectiveConviction": "Your reported conviction in this thought at the time: {value}/100",
+    "roleLabel": "Your evidence role",
+    "roles": {
+      "supporting": "Supporting",
+      "contradicting": "Contradicting",
+      "complicating": "Complicating",
+      "contextualizing": "Contextualizing"
+    },
+    "unclassified": "Unclassified",
+    "reviewCurrentSource": "The earlier selection is stale. Select this current representation again to review it; its old role will not carry over.",
+    "staleNotice": "Some selected sources changed or disappeared. Review the current records before using a summary.",
+    "sourceChanged": "Source changed; review again",
+    "sourceNotFound": "Source no longer exists; review again",
+    "removeUnavailable": "Remove stale selection",
+    "reviewInvalid": "Enter Candidate wording and Claim scope, and select at least one current record before reviewing a summary.",
+    "checking": "Checking current records…",
+    "summaryTitle": "Structured review of your Candidate",
+    "analysisScope": "Reviewed records / Analysis scope",
+    "analysisScopeExplanation": "Only the records listed below were reviewed. The linked situation may be context as well as a selected source.",
+    "limitationsTitle": "Limits of this review",
+    "limitedSelection": "Other saved records were not reviewed here; absence of a counterexample here is not proof that none exists.",
+    "dependence": "Several selected records may describe the same experience. Their number does not establish independent support or recurrence.",
+    "noChronology": "Save order does not establish when the experiences happened or whether anything changed over time.",
+    "noConclusion": "NOUS has not generated a psychological conclusion or confirmed a Pattern.",
+    "reviewSummary": "Review summary",
+    "continueEditing": "Continue editing",
+    "clearReview": "Clear review",
+    "close": "Close",
+    "errors": {
+      "subjectInvariant": "The local user record is inconsistent, so current records could not be loaded.",
+      "dataInconsistent": "Saved records are inconsistent, so this review cannot load them safely.",
+      "storageUnavailable": "Local storage is not ready.",
+      "loadFailed": "Current saved records could not be loaded. The previous summary is no longer current."
     }
   },
   "deletion": {
