@@ -4,6 +4,7 @@ import { LanguageSelector } from "../components/LanguageSelector";
 import { StructuredCapture } from "../components/StructuredCapture";
 import { StructuredHistory } from "../components/StructuredHistory";
 import { DataPortability } from "../components/DataPortability";
+import { CandidateReview } from "../components/CandidateReview";
 import {
   getMessages,
   resolveInitialLocale,
@@ -12,7 +13,7 @@ import {
 import { initializeDatabase } from "./database";
 
 type DatabaseStatus = "initializing" | "ready" | "error";
-type AppView = "capture" | "history" | "portability";
+type AppView = "capture" | "history" | "portability" | "candidate";
 
 export function App() {
   const [locale, setLocale] = useState<Locale>(() =>
@@ -82,13 +83,23 @@ export function App() {
             >
               {messages.navigation.portability}
             </button>
+            <button
+              className={view === "candidate" ? "view-switcher__active" : ""}
+              type="button"
+              aria-current={view === "candidate" ? "page" : undefined}
+              onClick={() => setView("candidate")}
+            >
+              {messages.navigation.candidate}
+            </button>
           </nav>
           {view === "capture" ? (
             <StructuredCapture messages={messages} />
           ) : view === "history" ? (
             <StructuredHistory messages={messages} />
-          ) : (
+          ) : view === "portability" ? (
             <DataPortability messages={messages} />
+          ) : (
+            <CandidateReview messages={messages} onClose={() => setView("history")} />
           )}
         </>
       ) : (

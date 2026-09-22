@@ -60,6 +60,31 @@ describe("localization", () => {
     expect(getMessages("zh-CN").portability.privacy).toContain("不会自动上传");
     expect(getMessages("en").portability.privacy).toContain("does not automatically upload it or add NOUS-specific encryption");
     expect(getMessages("zh-CN").portability.privacy).toContain("不会为文件额外添加 NOUS 专用加密");
+    expect(Object.keys(getMessages("zh-CN").candidateReview)).toEqual(
+      Object.keys(getMessages("en").candidateReview),
+    );
+    expect(Object.keys(getMessages("zh-CN").candidateReview.roles)).toEqual(
+      Object.keys(getMessages("en").candidateReview.roles),
+    );
+    expect(Object.keys(getMessages("zh-CN").candidateReview.errors)).toEqual(
+      Object.keys(getMessages("en").candidateReview.errors),
+    );
+    expect(getMessages("en").candidateReview.title).toBe("Candidate review");
+    expect(getMessages("zh-CN").candidateReview.title).toBe("候选模式审阅");
+    expect(getMessages("en").candidateReview.roles.contradicting).toBe("Contradicting");
+    expect(getMessages("zh-CN").candidateReview.roles.contradicting).toBe("与候选说法相矛盾");
+    expect(getMessages("en").candidateReview.unclassified).toBe("Unclassified");
+    expect(getMessages("zh-CN").candidateReview.unclassified).toBe("尚未分类");
+    expect(getMessages("en").candidateReview.notSaved).toContain("not saved");
+    expect(getMessages("zh-CN").candidateReview.notSaved).toContain("不会保存");
+    expect(getMessages("en").candidateReview.sourceChanged).toContain("review again");
+    expect(getMessages("zh-CN").candidateReview.sourceChanged).toContain("重新审阅");
+    expect(getMessages("en").candidateReview.sourceNotFound).toContain("no longer exists");
+    expect(getMessages("zh-CN").candidateReview.sourceNotFound).toContain("不存在");
+    expect(getMessages("en").candidateReview.dependence).toContain("does not establish independent support");
+    expect(getMessages("zh-CN").candidateReview.dependence).toContain("不证明证据独立");
+    expect(getMessages("en").candidateReview.noChronology).toContain("Save order does not establish");
+    expect(getMessages("zh-CN").candidateReview.noChronology).toContain("保存顺序不能说明");
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {

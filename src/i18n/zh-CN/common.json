@@ -14,10 +14,11 @@
     "error": "本地存储初始化失败"
   },
   "navigation": {
-    "label": "记住功能视图",
+    "label": "NOUS 页面",
     "capture": "记录",
     "history": "已保存的记录",
-    "portability": "导出与备份"
+    "portability": "导出与备份",
+    "candidate": "候选模式审阅"
   },
   "capture": {
     "eyebrow": "记住",
@@ -81,6 +82,71 @@
       "dataInconsistent": "部分已保存记录不一致，因此无法安全展示此页面。",
       "storageUnavailable": "本地存储尚未就绪。",
       "loadFailed": "无法加载已保存的记录。"
+    }
+  },
+  "candidateReview": {
+    "eyebrow": "连接 · 临时审阅",
+    "title": "候选模式审阅",
+    "intro": "只用你选择的已保存记录，审阅一种可能重复出现的情况。说法和证据角色由你决定；NOUS 不会在这里断定存在某个模式。",
+    "notSaved": "本次审阅不会保存。离开此页面或重新加载应用后，审阅内容会消失。",
+    "candidateLabel": "候选说法",
+    "candidatePlaceholder": "写下一个具体、可以检验的可能情况……",
+    "wordingGuidance": "尽量描述自己的经历及其情境。例如，“在这些团队项目中，发生冲突后我倾向于退缩”比给自己贴固定标签更有边界。这段提示不会修改你的文字。",
+    "claimScopeLabel": "主张适用范围",
+    "claimScopePlaceholder": "你认为这个说法可能适用于哪些情境或条件？",
+    "scopeGuidance": "主张适用范围由你在此写明。下方的审阅范围仅是本次选择的记录；这些记录不会自动支持更广泛的说法。",
+    "sourcesTitle": "选择已保存的记录",
+    "roleMeaning": "每条选中的记录可指定一种角色，也可保持尚未分类。这些是你的分类，不是证明或评分。",
+    "loading": "正在读取当前已保存的记录……",
+    "retry": "重试",
+    "noSources": "目前没有可供审阅的已保存情境、经历细节或想法。",
+    "situationHeading": "情境",
+    "situationDualRole": "这个情境本身可以选作来源；对下方关联记录，它也提供背景。这些记录不自动代表不同的经历。",
+    "observationHeading": "关联的经历细节",
+    "thoughtHeading": "关联的想法",
+    "standaloneObservations": "未关联情境的经历细节",
+    "standaloneThoughts": "未关联情境的想法",
+    "sourceTypes": {
+      "situation": "情境",
+      "observation": "经历细节",
+      "thought": "想法"
+    },
+    "selectSource": "选择记录",
+    "deselectSource": "取消选择记录",
+    "linkedContext": "关联情境背景",
+    "subjectiveConviction": "你当时对这个想法报告的主观确信程度：{value}/100",
+    "roleLabel": "你指定的证据角色",
+    "roles": {
+      "supporting": "支持",
+      "contradicting": "与候选说法相矛盾",
+      "complicating": "使判断更复杂",
+      "contextualizing": "提供背景"
+    },
+    "unclassified": "尚未分类",
+    "reviewCurrentSource": "先前选择的表述已经过时。请重新选择并审阅当前表述；旧角色不会沿用。",
+    "staleNotice": "部分选中的来源已变化或不存在。请重新审阅当前记录，再查看摘要。",
+    "sourceChanged": "来源已变化，请重新审阅",
+    "sourceNotFound": "来源已不存在，请重新审阅",
+    "removeUnavailable": "移除过时的选择",
+    "reviewInvalid": "请填写候选说法和主张适用范围，并至少选择一条当前记录，再查看摘要。",
+    "checking": "正在核对当前记录……",
+    "summaryTitle": "候选说法的结构化审阅",
+    "analysisScope": "本次审阅的记录／审阅范围",
+    "analysisScopeExplanation": "本次只审阅下列记录。关联情境既可能作为背景，也可能本身被选作来源。",
+    "limitationsTitle": "本次审阅的限制",
+    "limitedSelection": "这里没有审阅其他已保存记录；本次未看到反例，并不证明其他地方没有反例。",
+    "dependence": "多条选中的记录可能描述同一次经历。记录数量不证明证据独立，也不证明重复发生。",
+    "noChronology": "保存顺序不能说明经历何时发生，也不能据此判断随时间的变化。",
+    "noConclusion": "NOUS 没有生成心理结论，也没有确认任何模式。",
+    "reviewSummary": "查看审阅摘要",
+    "continueEditing": "继续修改",
+    "clearReview": "清空审阅",
+    "close": "关闭",
+    "errors": {
+      "subjectInvariant": "本地用户记录不一致，无法读取当前记录。",
+      "dataInconsistent": "已保存的记录不一致，无法安全地加载本次审阅。",
+      "storageUnavailable": "本地存储尚未就绪。",
+      "loadFailed": "无法读取当前已保存的记录。先前的摘要不再视为当前有效。"
     }
   },
   "deletion": {
