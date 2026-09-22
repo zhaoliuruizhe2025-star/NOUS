@@ -16,7 +16,8 @@
   "navigation": {
     "label": "Remember views",
     "capture": "Capture",
-    "history": "Saved records"
+    "history": "Saved records",
+    "portability": "Export and backup"
   },
   "capture": {
     "eyebrow": "Remember",
@@ -99,6 +100,29 @@
       "storageUnavailable": "Local storage is not ready. Nothing was deleted.",
       "deleteConflict": "The deletion conflicted with local data. Nothing was deleted.",
       "deleteFailed": "The record could not be deleted. No partial deletion was kept."
+    }
+  },
+  "portability": {
+    "eyebrow": "Your data",
+    "title": "Export and backup",
+    "exportAction": "Export data",
+    "exportExplanation": "Create a portable JSON copy of saved NOUS user data, including relationships and correction provenance.",
+    "backupAction": "Create database backup",
+    "backupExplanation": "Create a consistent SQLite copy of the current NOUS database. In-app Restore is not available yet.",
+    "privacy": "The file is saved where you choose. NOUS does not automatically upload it or add NOUS-specific encryption.",
+    "workingExport": "Creating export…",
+    "workingBackup": "Creating backup…",
+    "exportComplete": "Export created.",
+    "backupComplete": "Database backup created.",
+    "errors": {
+      "subjectInvariant": "The local user record is inconsistent. No export was created.",
+      "dataInconsistent": "Saved data is inconsistent. A portable export could not be created safely.",
+      "storageUnavailable": "Local storage is not ready.",
+      "serializationFailed": "The portable data could not be prepared.",
+      "destinationUnavailable": "This location cannot safely receive the file. Choose another location.",
+      "destinationExists": "A file already exists there. Choose another filename or location.",
+      "exportFailed": "The export could not be created.",
+      "backupFailed": "The database backup could not be created."
     }
   },
   "correction": {

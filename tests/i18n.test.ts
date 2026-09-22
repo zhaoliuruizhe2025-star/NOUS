@@ -50,6 +50,16 @@ describe("localization", () => {
     expect(getMessages("zh-CN").deletion.confirm).toBe("永久删除");
     expect(getMessages("en").deletion.consequence).toContain("cannot be undone");
     expect(getMessages("zh-CN").deletion.consequence).toContain("无法撤销");
+    expect(Object.keys(getMessages("zh-CN").portability)).toEqual(Object.keys(getMessages("en").portability));
+    expect(Object.keys(getMessages("zh-CN").portability.errors)).toEqual(Object.keys(getMessages("en").portability.errors));
+    expect(getMessages("en").portability.exportExplanation).toContain("JSON");
+    expect(getMessages("zh-CN").portability.exportExplanation).toContain("JSON");
+    expect(getMessages("en").portability.backupExplanation).toContain("Restore is not available");
+    expect(getMessages("zh-CN").portability.backupExplanation).toContain("尚不支持在应用内恢复");
+    expect(getMessages("en").portability.privacy).toContain("does not automatically upload");
+    expect(getMessages("zh-CN").portability.privacy).toContain("不会自动上传");
+    expect(getMessages("en").portability.privacy).toContain("does not automatically upload it or add NOUS-specific encryption");
+    expect(getMessages("zh-CN").portability.privacy).toContain("不会为文件额外添加 NOUS 专用加密");
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {

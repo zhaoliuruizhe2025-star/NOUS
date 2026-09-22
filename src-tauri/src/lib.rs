@@ -50,6 +50,7 @@ pub fn run() {
                 .add_migrations(DATABASE_URL, migrations())
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             persistence::install_shared_sqlite_pool(app)?;
             Ok(())
@@ -59,7 +60,9 @@ pub fn run() {
             commands::save_structured_capture,
             commands::load_structured_history,
             commands::correct_structured_record,
-            commands::delete_structured_record
+            commands::delete_structured_record,
+            commands::export_user_data,
+            commands::create_database_backup
         ])
         .run(tauri::generate_context!())
         .expect("error while running NOUS");

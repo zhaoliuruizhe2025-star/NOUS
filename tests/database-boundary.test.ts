@@ -70,6 +70,10 @@ describe("frontend database security boundary", () => {
     expect(librarySource).toContain("commands::load_structured_history");
     expect(librarySource).toContain("commands::correct_structured_record");
     expect(librarySource).toContain("commands::delete_structured_record");
+    expect(librarySource).toContain("commands::export_user_data");
+    expect(librarySource).toContain("commands::create_database_backup");
+    expect(commandSource).toMatch(/async fn export_user_data\(\s*app: tauri::AppHandle,\s*database: State<'_, SharedSqlitePool>,?\s*\)/);
+    expect(commandSource).toMatch(/async fn create_database_backup\(\s*app: tauri::AppHandle,\s*database: State<'_, SharedSqlitePool>,?\s*\)/);
     expect(commandSource).toContain("enum CorrectStructuredRecordRequest");
     expect(commandSource).toContain("deny_unknown_fields");
     expect(commandSource).toMatch(
