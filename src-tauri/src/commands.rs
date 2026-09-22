@@ -5,15 +5,17 @@ use tauri::State;
 
 use crate::{
     application::{
+        correct_structured_record as correct_structured_record_workflow,
         load_structured_history as load_structured_history_workflow,
-        save_structured_capture as save_structured_capture_workflow, ObservationCaptureInput,
-        SaveStructuredCaptureInput, SavedStructuredCapture, SituationCaptureInput,
-        StructuredCaptureError, StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
+        save_structured_capture as save_structured_capture_workflow, CorrectionInput,
+        ObservationCaptureInput, SaveStructuredCaptureInput, SavedStructuredCapture,
+        SituationCaptureInput, StructuredCaptureError, StructuredCorrectionError,
+        StructuredHistory, StructuredHistoryError, ThoughtCaptureInput,
     },
     persistence::{PersistenceError, SharedSqlitePool, SqliteSelfModelRepository},
 };
 
-const EXPECTED_SCHEMA_VERSION: &str = "4";
+const EXPECTED_SCHEMA_VERSION: &str = "5";
 const READINESS_ERROR: &str = "Local database readiness verification failed.";
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -95,6 +97,49 @@ pub(crate) struct StructuredCaptureCommandError {
 pub(crate) struct StructuredHistoryObservationResponse {
     id: String,
     content: String,
+    state_token: String,
+    corrected: bool,
+    corrections: Vec<ObservationCorrectionResponse>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ContextReferenceResponse {
+    id: String,
+    description: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SituationCorrectionResponse {
+    sequence: u32,
+    before_description: String,
+    after_description: String,
+    note: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ObservationCorrectionResponse {
+    sequence: u32,
+    before_content: String,
+    after_content: String,
+    before_context: Option<ContextReferenceResponse>,
+    after_context: Option<ContextReferenceResponse>,
+    note: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ThoughtCorrectionResponse {
+    sequence: u32,
+    before_content: String,
+    after_content: String,
+    before_context: Option<ContextReferenceResponse>,
+    after_context: Option<ContextReferenceResponse>,
+    before_subjective_conviction: Option<u8>,
+    after_subjective_conviction: Option<u8>,
+    note: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -103,6 +148,9 @@ pub(crate) struct StructuredHistoryThoughtResponse {
     id: String,
     content: String,
     subjective_conviction: Option<u8>,
+    state_token: String,
+    corrected: bool,
+    corrections: Vec<ThoughtCorrectionResponse>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -110,6 +158,9 @@ pub(crate) struct StructuredHistoryThoughtResponse {
 pub(crate) struct StructuredHistoryContextResponse {
     id: String,
     description: String,
+    state_token: String,
+    corrected: bool,
+    corrections: Vec<SituationCorrectionResponse>,
     observations: Vec<StructuredHistoryObservationResponse>,
     thoughts: Vec<StructuredHistoryThoughtResponse>,
 }
@@ -125,6 +176,67 @@ pub(crate) struct StructuredHistoryResponse {
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StructuredHistoryCommandError {
+    code: &'static str,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CorrectionContextRequest {
+    None,
+    Existing { situation_id: String },
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CorrectionConvictionRequest {
+    NotReported,
+    Reported { value: u8 },
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(
+    tag = "recordType",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CorrectStructuredRecordRequest {
+    Situation {
+        target_id: String,
+        expected_state_token: String,
+        description: String,
+        note: Option<String>,
+    },
+    Observation {
+        target_id: String,
+        expected_state_token: String,
+        content: String,
+        context: CorrectionContextRequest,
+        note: Option<String>,
+    },
+    Thought {
+        target_id: String,
+        expected_state_token: String,
+        content: String,
+        context: CorrectionContextRequest,
+        subjective_conviction: CorrectionConvictionRequest,
+        note: Option<String>,
+    },
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StructuredCorrectionCommandError {
     code: &'static str,
 }
 
@@ -158,6 +270,117 @@ pub(crate) async fn load_structured_history(
     database: State<'_, SharedSqlitePool>,
 ) -> Result<StructuredHistoryResponse, StructuredHistoryCommandError> {
     load_structured_history_for_pool(&database).await
+}
+
+#[tauri::command]
+pub(crate) async fn correct_structured_record(
+    database: State<'_, SharedSqlitePool>,
+    request: CorrectStructuredRecordRequest,
+) -> Result<StructuredHistoryResponse, StructuredCorrectionCommandError> {
+    let recorded_at_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .ok_or(StructuredCorrectionCommandError {
+            code: "clockUnavailable",
+        })?;
+    let repository = SqliteSelfModelRepository::new(database.inner().clone());
+    let result = correct_structured_record_workflow(&repository, request.into(), recorded_at_ms)
+        .await
+        .map_err(map_correction_error)?;
+    Ok(result.into())
+}
+
+fn map_correction_error(error: StructuredCorrectionError) -> StructuredCorrectionCommandError {
+    let code = match error {
+        StructuredCorrectionError::InvalidCorrection
+        | StructuredCorrectionError::Persistence(PersistenceError::InvalidCorrection(_)) => {
+            "invalidCorrection"
+        }
+        StructuredCorrectionError::Persistence(PersistenceError::NotFound { .. }) => {
+            "targetNotFound"
+        }
+        StructuredCorrectionError::Persistence(PersistenceError::NoChanges) => "noChanges",
+        StructuredCorrectionError::Persistence(PersistenceError::StaleCorrection) => {
+            "staleCorrection"
+        }
+        StructuredCorrectionError::Persistence(PersistenceError::EvidenceReferenceBlocked) => {
+            "evidenceReferenceBlocked"
+        }
+        StructuredCorrectionError::Persistence(PersistenceError::SubjectInvariant(_)) => {
+            "subjectInvariant"
+        }
+        StructuredCorrectionError::Persistence(PersistenceError::DataInconsistent(_))
+        | StructuredCorrectionError::Persistence(PersistenceError::DomainReconstruction {
+            ..
+        })
+        | StructuredCorrectionError::History(_) => "dataInconsistent",
+        StructuredCorrectionError::Persistence(PersistenceError::NotReady(_)) => {
+            "storageUnavailable"
+        }
+        StructuredCorrectionError::Persistence(PersistenceError::CorrectionConflict(_))
+        | StructuredCorrectionError::Persistence(PersistenceError::ConstraintViolation {
+            ..
+        }) => "correctionConflict",
+        StructuredCorrectionError::Persistence(_) => "saveFailed",
+    };
+    StructuredCorrectionCommandError { code }
+}
+
+fn context_id(context: CorrectionContextRequest) -> Option<String> {
+    match context {
+        CorrectionContextRequest::None => None,
+        CorrectionContextRequest::Existing { situation_id } => Some(situation_id),
+    }
+}
+
+impl From<CorrectStructuredRecordRequest> for CorrectionInput {
+    fn from(request: CorrectStructuredRecordRequest) -> Self {
+        match request {
+            CorrectStructuredRecordRequest::Situation {
+                target_id,
+                expected_state_token,
+                description,
+                note,
+            } => Self::Situation {
+                target_id,
+                expected_state_token,
+                description,
+                note,
+            },
+            CorrectStructuredRecordRequest::Observation {
+                target_id,
+                expected_state_token,
+                content,
+                context,
+                note,
+            } => Self::Observation {
+                target_id,
+                expected_state_token,
+                content,
+                situation_id: context_id(context),
+                note,
+            },
+            CorrectStructuredRecordRequest::Thought {
+                target_id,
+                expected_state_token,
+                content,
+                context,
+                subjective_conviction,
+                note,
+            } => Self::Thought {
+                target_id,
+                expected_state_token,
+                content,
+                situation_id: context_id(context),
+                subjective_conviction: match subjective_conviction {
+                    CorrectionConvictionRequest::NotReported => None,
+                    CorrectionConvictionRequest::Reported { value } => Some(value),
+                },
+                note,
+            },
+        }
+    }
 }
 
 async fn save_structured_capture_for_pool(
@@ -212,6 +435,7 @@ fn map_capture_error(error: StructuredCaptureError) -> StructuredCaptureCommandE
 fn map_history_error(error: StructuredHistoryError) -> StructuredHistoryCommandError {
     let code = match error {
         StructuredHistoryError::DataInconsistent
+        | StructuredHistoryError::Persistence(PersistenceError::DataInconsistent(_))
         | StructuredHistoryError::Persistence(PersistenceError::DomainReconstruction { .. }) => {
             "dataInconsistent"
         }
@@ -290,12 +514,48 @@ impl From<StructuredHistory> for StructuredHistoryResponse {
                 .map(|context| StructuredHistoryContextResponse {
                     id: context.id,
                     description: context.description,
+                    state_token: context.state_token,
+                    corrected: context.corrected,
+                    corrections: context
+                        .corrections
+                        .into_iter()
+                        .map(|item| SituationCorrectionResponse {
+                            sequence: item.sequence,
+                            before_description: item.before_description,
+                            after_description: item.after_description,
+                            note: item.note,
+                        })
+                        .collect(),
                     observations: context
                         .observations
                         .into_iter()
                         .map(|observation| StructuredHistoryObservationResponse {
                             id: observation.id,
                             content: observation.content,
+                            state_token: observation.state_token,
+                            corrected: observation.corrected,
+                            corrections: observation
+                                .corrections
+                                .into_iter()
+                                .map(|item| ObservationCorrectionResponse {
+                                    sequence: item.sequence,
+                                    before_content: item.before_content,
+                                    after_content: item.after_content,
+                                    before_context: item.before_context.map(|context| {
+                                        ContextReferenceResponse {
+                                            id: context.id,
+                                            description: context.description,
+                                        }
+                                    }),
+                                    after_context: item.after_context.map(|context| {
+                                        ContextReferenceResponse {
+                                            id: context.id,
+                                            description: context.description,
+                                        }
+                                    }),
+                                    note: item.note,
+                                })
+                                .collect(),
                         })
                         .collect(),
                     thoughts: context
@@ -305,6 +565,32 @@ impl From<StructuredHistory> for StructuredHistoryResponse {
                             id: thought.id,
                             content: thought.content,
                             subjective_conviction: thought.subjective_conviction,
+                            state_token: thought.state_token,
+                            corrected: thought.corrected,
+                            corrections: thought
+                                .corrections
+                                .into_iter()
+                                .map(|item| ThoughtCorrectionResponse {
+                                    sequence: item.sequence,
+                                    before_content: item.before_content,
+                                    after_content: item.after_content,
+                                    before_context: item.before_context.map(|context| {
+                                        ContextReferenceResponse {
+                                            id: context.id,
+                                            description: context.description,
+                                        }
+                                    }),
+                                    after_context: item.after_context.map(|context| {
+                                        ContextReferenceResponse {
+                                            id: context.id,
+                                            description: context.description,
+                                        }
+                                    }),
+                                    before_subjective_conviction: item.before_subjective_conviction,
+                                    after_subjective_conviction: item.after_subjective_conviction,
+                                    note: item.note,
+                                })
+                                .collect(),
                         })
                         .collect(),
                 })
@@ -315,6 +601,30 @@ impl From<StructuredHistory> for StructuredHistoryResponse {
                 .map(|observation| StructuredHistoryObservationResponse {
                     id: observation.id,
                     content: observation.content,
+                    state_token: observation.state_token,
+                    corrected: observation.corrected,
+                    corrections: observation
+                        .corrections
+                        .into_iter()
+                        .map(|item| ObservationCorrectionResponse {
+                            sequence: item.sequence,
+                            before_content: item.before_content,
+                            after_content: item.after_content,
+                            before_context: item.before_context.map(|context| {
+                                ContextReferenceResponse {
+                                    id: context.id,
+                                    description: context.description,
+                                }
+                            }),
+                            after_context: item.after_context.map(|context| {
+                                ContextReferenceResponse {
+                                    id: context.id,
+                                    description: context.description,
+                                }
+                            }),
+                            note: item.note,
+                        })
+                        .collect(),
                 })
                 .collect(),
             standalone_thoughts: history
@@ -324,6 +634,32 @@ impl From<StructuredHistory> for StructuredHistoryResponse {
                     id: thought.id,
                     content: thought.content,
                     subjective_conviction: thought.subjective_conviction,
+                    state_token: thought.state_token,
+                    corrected: thought.corrected,
+                    corrections: thought
+                        .corrections
+                        .into_iter()
+                        .map(|item| ThoughtCorrectionResponse {
+                            sequence: item.sequence,
+                            before_content: item.before_content,
+                            after_content: item.after_content,
+                            before_context: item.before_context.map(|context| {
+                                ContextReferenceResponse {
+                                    id: context.id,
+                                    description: context.description,
+                                }
+                            }),
+                            after_context: item.after_context.map(|context| {
+                                ContextReferenceResponse {
+                                    id: context.id,
+                                    description: context.description,
+                                }
+                            }),
+                            before_subjective_conviction: item.before_subjective_conviction,
+                            after_subjective_conviction: item.after_subjective_conviction,
+                            note: item.note,
+                        })
+                        .collect(),
                 })
                 .collect(),
         }
@@ -352,14 +688,15 @@ fn status_for_schema_version(schema_version: Option<&str>) -> Result<DatabaseSta
         return Err(READINESS_ERROR);
     }
 
-    Ok(DatabaseStatus { schema_version: 4 })
+    Ok(DatabaseStatus { schema_version: 5 })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        database_status_for_pool, map_capture_error, map_history_error, status_for_schema_version,
-        DatabaseStatus, SaveStructuredCaptureRequest, StructuredCaptureError,
+        database_status_for_pool, map_capture_error, map_correction_error, map_history_error,
+        status_for_schema_version, CorrectStructuredRecordRequest, DatabaseStatus,
+        SaveStructuredCaptureRequest, StructuredCaptureError, StructuredCorrectionError,
         StructuredHistoryCommandError, StructuredHistoryError, READINESS_ERROR,
     };
     use crate::persistence::{PersistenceError, SharedSqlitePool};
@@ -368,9 +705,10 @@ mod tests {
     #[test]
     fn reports_ready_only_for_the_expected_schema_version() {
         assert_eq!(
-            status_for_schema_version(Some("4")),
-            Ok(DatabaseStatus { schema_version: 4 })
+            status_for_schema_version(Some("5")),
+            Ok(DatabaseStatus { schema_version: 5 })
         );
+        assert_eq!(status_for_schema_version(Some("4")), Err(READINESS_ERROR));
         assert_eq!(status_for_schema_version(Some("3")), Err(READINESS_ERROR));
         assert_eq!(status_for_schema_version(Some("2")), Err(READINESS_ERROR));
         assert_eq!(status_for_schema_version(Some("1")), Err(READINESS_ERROR));
@@ -380,9 +718,9 @@ mod tests {
     #[test]
     fn serializes_the_small_frontend_status_shape() {
         assert_eq!(
-            serde_json::to_value(DatabaseStatus { schema_version: 4 })
+            serde_json::to_value(DatabaseStatus { schema_version: 5 })
                 .expect("database status should serialize"),
-            serde_json::json!({ "schemaVersion": 4 })
+            serde_json::json!({ "schemaVersion": 5 })
         );
     }
 
@@ -427,6 +765,77 @@ mod tests {
         assert_eq!(serialized, r#"{"code":"saveFailed","itemIndex":null}"#);
         assert!(!serialized.contains("SQL"));
         assert!(!serialized.contains("secret"));
+    }
+
+    #[test]
+    fn structured_correction_request_is_typed_and_rejects_caller_authority() {
+        for valid in [
+            serde_json::json!({"recordType":"situation","targetId":"s","expectedStateToken":"initial:situation:s","description":"Thursday","note":null}),
+            serde_json::json!({"recordType":"observation","targetId":"o","expectedStateToken":"initial:observation:o","content":"They said they were busy","context":{"kind":"existing","situationId":"s"},"note":null}),
+            serde_json::json!({"recordType":"thought","targetId":"t","expectedStateToken":"initial:thought:t","content":"I worried","context":{"kind":"none"},"subjectiveConviction":{"kind":"reported","value":60},"note":null}),
+        ] {
+            assert!(
+                serde_json::from_value::<CorrectStructuredRecordRequest>(valid.clone()).is_ok(),
+                "{valid}"
+            );
+            for field in [
+                "subjectId",
+                "correctionSequence",
+                "auditId",
+                "createdAtMs",
+                "newStateToken",
+                "evidenceLinkId",
+                "persistenceIntent",
+                "sql",
+            ] {
+                let mut invalid = valid.clone();
+                invalid
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(field.into(), serde_json::json!("forbidden"));
+                assert!(
+                    serde_json::from_value::<CorrectStructuredRecordRequest>(invalid).is_err(),
+                    "accepted {field}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn correction_errors_return_safe_codes_without_storage_details() {
+        for (error, code) in [
+            (
+                StructuredCorrectionError::Persistence(PersistenceError::StaleCorrection),
+                "staleCorrection",
+            ),
+            (
+                StructuredCorrectionError::Persistence(PersistenceError::NoChanges),
+                "noChanges",
+            ),
+            (
+                StructuredCorrectionError::Persistence(PersistenceError::EvidenceReferenceBlocked),
+                "evidenceReferenceBlocked",
+            ),
+            (
+                StructuredCorrectionError::Persistence(PersistenceError::DataInconsistent(
+                    "raw row".into(),
+                )),
+                "dataInconsistent",
+            ),
+            (
+                StructuredCorrectionError::Persistence(PersistenceError::Storage(
+                    "SQL path".into(),
+                )),
+                "saveFailed",
+            ),
+        ] {
+            let mapped = map_correction_error(error);
+            assert_eq!(mapped.code, code);
+            let serialized = serde_json::to_string(&mapped).unwrap();
+            assert!(!serialized.contains("SQL"));
+            assert!(!serialized.contains("raw row"));
+            assert!(!serialized.contains("path"));
+        }
     }
 
     #[test]
@@ -528,7 +937,15 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 database_status_for_pool(&database).await,
-                Ok(DatabaseStatus { schema_version: 4 })
+                Err(READINESS_ERROR)
+            );
+            sqlx::query("UPDATE app_metadata SET value = '5' WHERE key = 'schema_version'")
+                .execute(&pool)
+                .await
+                .unwrap();
+            assert_eq!(
+                database_status_for_pool(&database).await,
+                Ok(DatabaseStatus { schema_version: 5 })
             );
 
             let mut connection = pool.acquire().await.unwrap();

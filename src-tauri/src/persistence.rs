@@ -2,6 +2,7 @@ use std::{error::Error, fmt};
 
 use sqlx::{
     error::ErrorKind, pool::PoolConnection, sqlite::SqliteRow, Connection, Row, Sqlite, SqlitePool,
+    Transaction,
 };
 use tauri::{Manager, Runtime};
 use tauri_plugin_sql::{DbInstances, DbPool};
@@ -170,6 +171,12 @@ pub(crate) enum PersistenceError {
     #[allow(dead_code)]
     NotReady(String),
     SubjectInvariant(String),
+    DataInconsistent(String),
+    InvalidCorrection(String),
+    NoChanges,
+    StaleCorrection,
+    EvidenceReferenceBlocked,
+    CorrectionConflict(String),
 }
 
 impl fmt::Display for PersistenceError {
@@ -194,6 +201,16 @@ impl fmt::Display for PersistenceError {
             Self::NotReady(detail) => write!(formatter, "persistence is not ready: {detail}"),
             Self::SubjectInvariant(detail) => {
                 write!(formatter, "self-subject invariant failure: {detail}")
+            }
+            Self::DataInconsistent(detail) => write!(formatter, "data is inconsistent: {detail}"),
+            Self::InvalidCorrection(detail) => write!(formatter, "invalid correction: {detail}"),
+            Self::NoChanges => write!(formatter, "the correction does not change the record"),
+            Self::StaleCorrection => write!(formatter, "the correction is based on stale state"),
+            Self::EvidenceReferenceBlocked => {
+                write!(formatter, "the record is referenced by an EvidenceLink")
+            }
+            Self::CorrectionConflict(detail) => {
+                write!(formatter, "correction conflict: {detail}")
             }
         }
     }
@@ -277,18 +294,54 @@ type ValueRevisionDatabaseRow = (
 pub(crate) struct HistorySituationRecord {
     pub(crate) value: crate::domain::Situation,
     pub(crate) created_at_ms: i64,
+    pub(crate) state_token: String,
+    pub(crate) corrections: Vec<SituationCorrectionRecord>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct HistoryObservationRecord {
     pub(crate) value: crate::domain::Observation,
     pub(crate) created_at_ms: i64,
+    pub(crate) state_token: String,
+    pub(crate) corrections: Vec<ObservationCorrectionRecord>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct HistoryThoughtRecord {
     pub(crate) value: crate::domain::Thought,
     pub(crate) created_at_ms: i64,
+    pub(crate) state_token: String,
+    pub(crate) corrections: Vec<ThoughtCorrectionRecord>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SituationCorrectionRecord {
+    pub(crate) sequence: u32,
+    pub(crate) before_description: String,
+    pub(crate) after_description: String,
+    pub(crate) user_note: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ObservationCorrectionRecord {
+    pub(crate) sequence: u32,
+    pub(crate) before_content: String,
+    pub(crate) after_content: String,
+    pub(crate) before_situation_id: Option<crate::domain::SituationId>,
+    pub(crate) after_situation_id: Option<crate::domain::SituationId>,
+    pub(crate) user_note: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ThoughtCorrectionRecord {
+    pub(crate) sequence: u32,
+    pub(crate) before_content: String,
+    pub(crate) after_content: String,
+    pub(crate) before_situation_id: Option<crate::domain::SituationId>,
+    pub(crate) after_situation_id: Option<crate::domain::SituationId>,
+    pub(crate) before_confidence: Option<crate::domain::ThoughtConfidence>,
+    pub(crate) after_confidence: Option<crate::domain::ThoughtConfidence>,
+    pub(crate) user_note: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -296,6 +349,113 @@ pub(crate) struct StructuredHistoryRecords {
     pub(crate) situations: Vec<HistorySituationRecord>,
     pub(crate) observations: Vec<HistoryObservationRecord>,
     pub(crate) thoughts: Vec<HistoryThoughtRecord>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum StructuredCorrectionInput {
+    Situation {
+        target_id: crate::domain::SituationId,
+        expected_state_token: String,
+        description: String,
+        user_note: Option<String>,
+    },
+    Observation {
+        target_id: crate::domain::ObservationId,
+        expected_state_token: String,
+        content: String,
+        situation_id: Option<crate::domain::SituationId>,
+        user_note: Option<String>,
+    },
+    Thought {
+        target_id: crate::domain::ThoughtId,
+        expected_state_token: String,
+        content: String,
+        situation_id: Option<crate::domain::SituationId>,
+        confidence: Option<crate::domain::ThoughtConfidence>,
+        user_note: Option<String>,
+    },
+}
+
+type SituationCorrectionDatabaseRow = (
+    String,
+    String,
+    i64,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+    i64,
+);
+type ObservationCorrectionDatabaseRow = (
+    String,
+    String,
+    i64,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+    Option<String>,
+    i64,
+);
+type ThoughtCorrectionDatabaseRow = (
+    String,
+    String,
+    i64,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+    Option<i64>,
+    String,
+    String,
+    Option<String>,
+    i64,
+);
+
+#[derive(Clone, Debug)]
+struct ValidatedSituationCorrection {
+    target_id: crate::domain::SituationId,
+    subject_id: crate::domain::SelfSubjectId,
+    sequence: u32,
+    before_description: String,
+    after_description: String,
+    before_state_token: String,
+    after_state_token: String,
+    user_note: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct ValidatedObservationCorrection {
+    target_id: crate::domain::ObservationId,
+    subject_id: crate::domain::SelfSubjectId,
+    sequence: u32,
+    before_content: String,
+    after_content: String,
+    before_situation_id: Option<crate::domain::SituationId>,
+    after_situation_id: Option<crate::domain::SituationId>,
+    before_state_token: String,
+    after_state_token: String,
+    user_note: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct ValidatedThoughtCorrection {
+    target_id: crate::domain::ThoughtId,
+    subject_id: crate::domain::SelfSubjectId,
+    sequence: u32,
+    before_content: String,
+    after_content: String,
+    before_situation_id: Option<crate::domain::SituationId>,
+    after_situation_id: Option<crate::domain::SituationId>,
+    before_confidence: Option<crate::domain::ThoughtConfidence>,
+    after_confidence: Option<crate::domain::ThoughtConfidence>,
+    before_state_token: String,
+    after_state_token: String,
+    user_note: Option<String>,
 }
 
 fn structured_history_inconsistency(
@@ -697,161 +857,242 @@ impl SqliteSelfModelRepository {
             .begin()
             .await
             .map_err(PersistenceError::from)?;
+        let records = load_structured_history_snapshot(&mut transaction).await?;
+        transaction.commit().await.map_err(PersistenceError::from)?;
+        Ok(records)
+    }
 
-        let subject_rows: Vec<(String, String, i64)> = sqlx::query_as(
-            "SELECT id, display_name, created_at_ms FROM self_subjects ORDER BY created_at_ms, id LIMIT 2",
-        )
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(PersistenceError::from)?;
+    pub(crate) async fn correct_structured_record_atomic(
+        &self,
+        correction: StructuredCorrectionInput,
+        recorded_at_ms: i64,
+    ) -> Result<StructuredHistoryRecords, PersistenceError> {
+        const OPERATION: &str = "correct_structured_record_atomic";
+        let mut connection = self.database.acquire_verified_connection().await?;
+        let mut transaction = (**connection.connection())
+            .begin_with("BEGIN IMMEDIATE")
+            .await
+            .map_err(PersistenceError::from)?;
 
-        if subject_rows.len() > 1 {
-            return Err(PersistenceError::SubjectInvariant(
-                "more than one SelfSubject exists".into(),
-            ));
-        }
+        let result = async {
+            let records = load_structured_history_snapshot(&mut transaction).await?;
 
-        let current_subject: Option<crate::domain::SelfSubject> = subject_rows
-            .into_iter()
-            .next()
-            .map(|(id, display_name, created_at_ms)| {
-                SelfSubjectRow {
-                    id,
-                    display_name,
-                    created_at_ms,
-                }
-                .try_into()
-            })
-            .transpose()?;
-
-        let situation_rows: Vec<(String, String, String, i64)> = sqlx::query_as(
-            "SELECT id, subject_id, description, created_at_ms FROM situations ORDER BY created_at_ms DESC, id DESC",
-        )
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(PersistenceError::from)?;
-        let observation_rows: Vec<(String, String, Option<String>, String, i64)> = sqlx::query_as(
-            "SELECT id, subject_id, situation_id, content, created_at_ms FROM observations ORDER BY created_at_ms DESC, id DESC",
-        )
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(PersistenceError::from)?;
-        let thought_rows: Vec<ThoughtDatabaseRow> = sqlx::query_as(
-            "SELECT id, subject_id, situation_id, content, confidence, created_at_ms FROM thoughts ORDER BY created_at_ms DESC, id DESC",
-        )
-        .fetch_all(&mut *transaction)
-        .await
-        .map_err(PersistenceError::from)?;
-
-        let situations = situation_rows
-            .into_iter()
-            .map(|(id, subject_id, description, created_at_ms)| {
-                let value = SituationRow {
-                    id,
-                    subject_id,
+            match correction {
+                StructuredCorrectionInput::Situation {
+                    target_id,
+                    expected_state_token,
                     description,
-                    created_at_ms,
+                    user_note,
+                } => {
+                    let current = records
+                        .situations
+                        .iter()
+                        .find(|record| record.value.id() == &target_id)
+                        .ok_or_else(|| PersistenceError::NotFound {
+                            entity: "Situation",
+                            id: target_id.as_str().to_owned(),
+                        })?;
+                    ensure_current_token(&expected_state_token, &current.state_token)?;
+                    let corrected = crate::domain::Situation::new(
+                        target_id.clone(),
+                        current.value.subject_id().clone(),
+                        description,
+                    )
+                    .map_err(|error| PersistenceError::InvalidCorrection(error.to_string()))?;
+                    if corrected.description() == current.value.description() {
+                        return Err(PersistenceError::NoChanges);
+                    }
+                    ensure_not_evidence_source(
+                        &mut transaction,
+                        "Situation",
+                        "source_situation_id",
+                        target_id.as_str(),
+                        current.value.subject_id().as_str(),
+                    )
+                    .await?;
+                    let sequence = next_correction_sequence(current.corrections.len())?;
+                    let after_token = new_state_token(&mut transaction, "situation").await?;
+                    sqlx::query("INSERT INTO situation_corrections (situation_id, subject_id, correction_sequence, before_description, after_description, before_state_token, after_state_token, user_note, recorded_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                        .bind(target_id.as_str())
+                        .bind(current.value.subject_id().as_str())
+                        .bind(i64::from(sequence))
+                        .bind(current.value.description())
+                        .bind(corrected.description())
+                        .bind(&current.state_token)
+                        .bind(&after_token)
+                        .bind(user_note)
+                        .bind(recorded_at_ms)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| correction_write_error(OPERATION, error))?;
+                    let updated = sqlx::query("UPDATE situations SET description = ? WHERE id = ? AND subject_id = ? AND description = ?")
+                        .bind(corrected.description())
+                        .bind(target_id.as_str())
+                        .bind(current.value.subject_id().as_str())
+                        .bind(current.value.description())
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| correction_write_error(OPERATION, error))?;
+                    ensure_one_updated(updated.rows_affected())?;
                 }
-                .try_into()?;
-                Ok(HistorySituationRecord {
-                    value,
-                    created_at_ms,
-                })
-            })
-            .collect::<Result<Vec<_>, PersistenceError>>()?;
-        let observations = observation_rows
-            .into_iter()
-            .map(|(id, subject_id, situation_id, content, created_at_ms)| {
-                let value = ObservationRow {
-                    id,
-                    subject_id,
-                    situation_id,
+                StructuredCorrectionInput::Observation {
+                    target_id,
+                    expected_state_token,
                     content,
-                    created_at_ms,
+                    situation_id,
+                    user_note,
+                } => {
+                    let current = records
+                        .observations
+                        .iter()
+                        .find(|record| record.value.id() == &target_id)
+                        .ok_or_else(|| PersistenceError::NotFound {
+                            entity: "Observation",
+                            id: target_id.as_str().to_owned(),
+                        })?;
+                    ensure_current_token(&expected_state_token, &current.state_token)?;
+                    ensure_situation_exists(&records, situation_id.as_ref())?;
+                    let corrected = crate::domain::Observation::new(
+                        target_id.clone(),
+                        current.value.subject_id().clone(),
+                        situation_id,
+                        content,
+                    )
+                    .map_err(|error| PersistenceError::InvalidCorrection(error.to_string()))?;
+                    if corrected.content() == current.value.content()
+                        && corrected.situation_id() == current.value.situation_id()
+                    {
+                        return Err(PersistenceError::NoChanges);
+                    }
+                    ensure_not_evidence_source(
+                        &mut transaction,
+                        "Observation",
+                        "source_observation_id",
+                        target_id.as_str(),
+                        current.value.subject_id().as_str(),
+                    )
+                    .await?;
+                    let sequence = next_correction_sequence(current.corrections.len())?;
+                    let after_token = new_state_token(&mut transaction, "observation").await?;
+                    sqlx::query("INSERT INTO observation_corrections (observation_id, subject_id, correction_sequence, before_content, after_content, before_situation_id, after_situation_id, before_state_token, after_state_token, user_note, recorded_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                        .bind(target_id.as_str())
+                        .bind(current.value.subject_id().as_str())
+                        .bind(i64::from(sequence))
+                        .bind(current.value.content())
+                        .bind(corrected.content())
+                        .bind(current.value.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(corrected.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(&current.state_token)
+                        .bind(&after_token)
+                        .bind(user_note)
+                        .bind(recorded_at_ms)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| correction_write_error(OPERATION, error))?;
+                    let updated = sqlx::query("UPDATE observations SET content = ?, situation_id = ? WHERE id = ? AND subject_id = ? AND content = ? AND situation_id IS ?")
+                        .bind(corrected.content())
+                        .bind(corrected.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(target_id.as_str())
+                        .bind(current.value.subject_id().as_str())
+                        .bind(current.value.content())
+                        .bind(current.value.situation_id().map(crate::domain::SituationId::as_str))
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| correction_write_error(OPERATION, error))?;
+                    ensure_one_updated(updated.rows_affected())?;
                 }
-                .try_into()?;
-                Ok(HistoryObservationRecord {
-                    value,
-                    created_at_ms,
-                })
-            })
-            .collect::<Result<Vec<_>, PersistenceError>>()?;
-        let thoughts = thought_rows
-            .into_iter()
-            .map(
-                |(id, subject_id, situation_id, content, confidence, created_at_ms)| {
-                    let value = ThoughtRow {
-                        id,
-                        subject_id,
+                StructuredCorrectionInput::Thought {
+                    target_id,
+                    expected_state_token,
+                    content,
+                    situation_id,
+                    confidence,
+                    user_note,
+                } => {
+                    let current = records
+                        .thoughts
+                        .iter()
+                        .find(|record| record.value.id() == &target_id)
+                        .ok_or_else(|| PersistenceError::NotFound {
+                            entity: "Thought",
+                            id: target_id.as_str().to_owned(),
+                        })?;
+                    ensure_current_token(&expected_state_token, &current.state_token)?;
+                    ensure_situation_exists(&records, situation_id.as_ref())?;
+                    let corrected = crate::domain::Thought::new(
+                        target_id.clone(),
+                        current.value.subject_id().clone(),
                         situation_id,
                         content,
                         confidence,
-                        created_at_ms,
+                    )
+                    .map_err(|error| PersistenceError::InvalidCorrection(error.to_string()))?;
+                    if corrected.content() == current.value.content()
+                        && corrected.situation_id() == current.value.situation_id()
+                        && corrected.confidence() == current.value.confidence()
+                    {
+                        return Err(PersistenceError::NoChanges);
                     }
-                    .try_into()?;
-                    Ok(HistoryThoughtRecord {
-                        value,
-                        created_at_ms,
-                    })
-                },
-            )
-            .collect::<Result<Vec<_>, PersistenceError>>()?;
-
-        match current_subject.as_ref() {
-            None if situations.is_empty() && observations.is_empty() && thoughts.is_empty() => {}
-            None => {
-                return Err(structured_history_inconsistency(
-                    "subject_id",
-                    "inspect-scope records exist without a SelfSubject",
-                ));
+                    ensure_not_evidence_source(
+                        &mut transaction,
+                        "Thought",
+                        "source_thought_id",
+                        target_id.as_str(),
+                        current.value.subject_id().as_str(),
+                    )
+                    .await?;
+                    let sequence = next_correction_sequence(current.corrections.len())?;
+                    let after_token = new_state_token(&mut transaction, "thought").await?;
+                    sqlx::query("INSERT INTO thought_corrections (thought_id, subject_id, correction_sequence, before_content, after_content, before_situation_id, after_situation_id, before_confidence, after_confidence, before_state_token, after_state_token, user_note, recorded_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                        .bind(target_id.as_str())
+                        .bind(current.value.subject_id().as_str())
+                        .bind(i64::from(sequence))
+                        .bind(current.value.content())
+                        .bind(corrected.content())
+                        .bind(current.value.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(corrected.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(current.value.confidence().map(|value| i64::from(value.value())))
+                        .bind(corrected.confidence().map(|value| i64::from(value.value())))
+                        .bind(&current.state_token)
+                        .bind(&after_token)
+                        .bind(user_note)
+                        .bind(recorded_at_ms)
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| correction_write_error(OPERATION, error))?;
+                    let updated = sqlx::query("UPDATE thoughts SET content = ?, situation_id = ?, confidence = ? WHERE id = ? AND subject_id = ? AND content = ? AND situation_id IS ? AND confidence IS ?")
+                        .bind(corrected.content())
+                        .bind(corrected.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(corrected.confidence().map(|value| i64::from(value.value())))
+                        .bind(target_id.as_str())
+                        .bind(current.value.subject_id().as_str())
+                        .bind(current.value.content())
+                        .bind(current.value.situation_id().map(crate::domain::SituationId::as_str))
+                        .bind(current.value.confidence().map(|value| i64::from(value.value())))
+                        .execute(&mut *transaction)
+                        .await
+                        .map_err(|error| correction_write_error(OPERATION, error))?;
+                    ensure_one_updated(updated.rows_affected())?;
+                }
             }
-            Some(subject)
-                if situations
-                    .iter()
-                    .any(|record| record.value.subject_id() != subject.id())
-                    || observations
-                        .iter()
-                        .any(|record| record.value.subject_id() != subject.id())
-                    || thoughts
-                        .iter()
-                        .any(|record| record.value.subject_id() != subject.id()) =>
-            {
-                return Err(structured_history_inconsistency(
-                    "subject_id",
-                    "an inspect-scope record does not belong to the current SelfSubject",
-                ));
+
+            load_structured_history_snapshot(&mut transaction).await
+        }
+        .await;
+
+        match result {
+            Ok(records) => {
+                transaction.commit().await.map_err(PersistenceError::from)?;
+                Ok(records)
             }
-            Some(_) => {}
+            Err(error) => {
+                transaction
+                    .rollback()
+                    .await
+                    .map_err(PersistenceError::from)?;
+                Err(error)
+            }
         }
-
-        let situation_ids: std::collections::HashSet<&str> = situations
-            .iter()
-            .map(|record| record.value.id().as_str())
-            .collect();
-        if observations.iter().any(|record| {
-            record
-                .value
-                .situation_id()
-                .is_some_and(|id| !situation_ids.contains(id.as_str()))
-        }) || thoughts.iter().any(|record| {
-            record
-                .value
-                .situation_id()
-                .is_some_and(|id| !situation_ids.contains(id.as_str()))
-        }) {
-            return Err(structured_history_inconsistency(
-                "situation_id",
-                "an inspect-scope relationship references a missing Situation",
-            ));
-        }
-
-        transaction.commit().await.map_err(PersistenceError::from)?;
-
-        Ok(StructuredHistoryRecords {
-            situations,
-            observations,
-            thoughts,
-        })
     }
 
     pub(crate) async fn create_structured_capture_atomic(
@@ -1879,6 +2120,823 @@ impl SqliteSelfModelRepository {
                 },
             )
             .collect()
+    }
+}
+
+fn initial_state_token(kind: &str, id: &str) -> String {
+    format!("initial:{kind}:{id}")
+}
+
+fn valid_corrected_token(kind: &str, token: &str) -> bool {
+    token
+        .strip_prefix(&format!("corrected:{kind}:"))
+        .is_some_and(|hex| hex.len() == 32 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+fn ensure_current_token(expected: &str, current: &str) -> Result<(), PersistenceError> {
+    if expected == current {
+        Ok(())
+    } else {
+        Err(PersistenceError::StaleCorrection)
+    }
+}
+
+fn next_correction_sequence(count: usize) -> Result<u32, PersistenceError> {
+    u32::try_from(count)
+        .ok()
+        .and_then(|value| value.checked_add(1))
+        .ok_or_else(|| PersistenceError::CorrectionConflict("correction sequence overflow".into()))
+}
+
+fn ensure_one_updated(rows_affected: u64) -> Result<(), PersistenceError> {
+    if rows_affected == 1 {
+        Ok(())
+    } else {
+        Err(PersistenceError::CorrectionConflict(
+            "the guarded entity update did not affect exactly one row".into(),
+        ))
+    }
+}
+
+fn correction_write_error(operation: &'static str, error: sqlx::Error) -> PersistenceError {
+    if matches!(
+        error.as_database_error().map(|value| value.kind()),
+        Some(
+            ErrorKind::UniqueViolation | ErrorKind::ForeignKeyViolation | ErrorKind::CheckViolation
+        )
+    ) {
+        PersistenceError::CorrectionConflict(format!("constraint conflict during {operation}"))
+    } else {
+        PersistenceError::from(error)
+    }
+}
+
+fn ensure_situation_exists(
+    records: &StructuredHistoryRecords,
+    situation_id: Option<&crate::domain::SituationId>,
+) -> Result<(), PersistenceError> {
+    if situation_id.is_none_or(|id| {
+        records
+            .situations
+            .iter()
+            .any(|record| record.value.id() == id)
+    }) {
+        Ok(())
+    } else {
+        Err(PersistenceError::InvalidCorrection(
+            "the selected Situation does not exist for the current SelfSubject".into(),
+        ))
+    }
+}
+
+async fn new_state_token(
+    transaction: &mut Transaction<'_, Sqlite>,
+    kind: &str,
+) -> Result<String, PersistenceError> {
+    let random: String = sqlx::query_scalar("SELECT lower(hex(randomblob(16)))")
+        .fetch_one(&mut **transaction)
+        .await
+        .map_err(PersistenceError::from)?;
+    Ok(format!("corrected:{kind}:{random}"))
+}
+
+async fn ensure_not_evidence_source(
+    transaction: &mut Transaction<'_, Sqlite>,
+    source_kind: &str,
+    source_column: &str,
+    target_id: &str,
+    current_subject_id: &str,
+) -> Result<(), PersistenceError> {
+    let query = format!(
+        "SELECT subject_id FROM evidence_links WHERE source_kind = ? AND {source_column} = ?"
+    );
+    let subject_ids: Vec<String> = sqlx::query_scalar(&query)
+        .bind(source_kind)
+        .bind(target_id)
+        .fetch_all(&mut **transaction)
+        .await
+        .map_err(PersistenceError::from)?;
+    if subject_ids
+        .iter()
+        .any(|subject_id| subject_id != current_subject_id)
+    {
+        return Err(PersistenceError::DataInconsistent(
+            "an exact-target EvidenceLink has conflicting subject ownership".into(),
+        ));
+    }
+    if subject_ids.is_empty() {
+        Ok(())
+    } else {
+        Err(PersistenceError::EvidenceReferenceBlocked)
+    }
+}
+
+fn checked_sequence(entity: &'static str, value: i64) -> Result<u32, PersistenceError> {
+    let sequence =
+        u32::try_from(value).map_err(|error| PersistenceError::DomainReconstruction {
+            entity,
+            field: "correction_sequence",
+            detail: error.to_string(),
+        })?;
+    if sequence == 0 {
+        Err(structured_history_inconsistency(
+            "correction_sequence",
+            "correction sequence must be positive",
+        ))
+    } else {
+        Ok(sequence)
+    }
+}
+
+fn checked_optional_note(
+    entity: &'static str,
+    note: Option<String>,
+) -> Result<Option<String>, PersistenceError> {
+    if note.as_ref().is_some_and(|value| value.trim().is_empty()) {
+        Err(PersistenceError::DomainReconstruction {
+            entity,
+            field: "user_note",
+            detail: "optional note is blank".into(),
+        })
+    } else {
+        Ok(note)
+    }
+}
+
+fn checked_token(
+    entity: &'static str,
+    field: &'static str,
+    value: String,
+) -> Result<String, PersistenceError> {
+    if value.trim().is_empty() {
+        Err(PersistenceError::DomainReconstruction {
+            entity,
+            field,
+            detail: "state token is blank".into(),
+        })
+    } else {
+        Ok(value)
+    }
+}
+
+async fn load_structured_history_snapshot(
+    transaction: &mut Transaction<'_, Sqlite>,
+) -> Result<StructuredHistoryRecords, PersistenceError> {
+    use std::collections::{HashMap, HashSet};
+
+    let subject_rows: Vec<(String, String, i64)> = sqlx::query_as(
+        "SELECT id, display_name, created_at_ms FROM self_subjects ORDER BY created_at_ms, id LIMIT 2",
+    )
+    .fetch_all(&mut **transaction)
+    .await
+    .map_err(PersistenceError::from)?;
+    if subject_rows.len() > 1 {
+        return Err(PersistenceError::SubjectInvariant(
+            "more than one SelfSubject exists".into(),
+        ));
+    }
+    let current_subject: Option<crate::domain::SelfSubject> = subject_rows
+        .into_iter()
+        .next()
+        .map(|(id, display_name, created_at_ms)| {
+            SelfSubjectRow {
+                id,
+                display_name,
+                created_at_ms,
+            }
+            .try_into()
+        })
+        .transpose()?;
+
+    let situation_rows: Vec<(String, String, String, i64)> = sqlx::query_as(
+        "SELECT id, subject_id, description, created_at_ms FROM situations ORDER BY created_at_ms DESC, id DESC",
+    ).fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let observation_rows: Vec<(String, String, Option<String>, String, i64)> = sqlx::query_as(
+        "SELECT id, subject_id, situation_id, content, created_at_ms FROM observations ORDER BY created_at_ms DESC, id DESC",
+    ).fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let thought_rows: Vec<ThoughtDatabaseRow> = sqlx::query_as(
+        "SELECT id, subject_id, situation_id, content, confidence, created_at_ms FROM thoughts ORDER BY created_at_ms DESC, id DESC",
+    ).fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let situation_correction_rows: Vec<SituationCorrectionDatabaseRow> = sqlx::query_as(
+        "SELECT situation_id, subject_id, correction_sequence, before_description, after_description, before_state_token, after_state_token, user_note, recorded_at_ms FROM situation_corrections ORDER BY situation_id, correction_sequence",
+    ).fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let observation_correction_rows: Vec<ObservationCorrectionDatabaseRow> = sqlx::query_as(
+        "SELECT observation_id, subject_id, correction_sequence, before_content, after_content, before_situation_id, after_situation_id, before_state_token, after_state_token, user_note, recorded_at_ms FROM observation_corrections ORDER BY observation_id, correction_sequence",
+    ).fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+    let thought_correction_rows: Vec<ThoughtCorrectionDatabaseRow> = sqlx::query_as(
+        "SELECT thought_id, subject_id, correction_sequence, before_content, after_content, before_situation_id, after_situation_id, before_confidence, after_confidence, before_state_token, after_state_token, user_note, recorded_at_ms FROM thought_corrections ORDER BY thought_id, correction_sequence",
+    ).fetch_all(&mut **transaction).await.map_err(PersistenceError::from)?;
+
+    let mut situations = situation_rows
+        .into_iter()
+        .map(|(id, subject_id, description, created_at_ms)| {
+            let value: crate::domain::Situation = SituationRow {
+                id,
+                subject_id,
+                description,
+                created_at_ms,
+            }
+            .try_into()?;
+            let state_token = initial_state_token("situation", value.id().as_str());
+            Ok(HistorySituationRecord {
+                value,
+                created_at_ms,
+                state_token,
+                corrections: Vec::new(),
+            })
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let mut observations = observation_rows
+        .into_iter()
+        .map(|(id, subject_id, situation_id, content, created_at_ms)| {
+            let value: crate::domain::Observation = ObservationRow {
+                id,
+                subject_id,
+                situation_id,
+                content,
+                created_at_ms,
+            }
+            .try_into()?;
+            let state_token = initial_state_token("observation", value.id().as_str());
+            Ok(HistoryObservationRecord {
+                value,
+                created_at_ms,
+                state_token,
+                corrections: Vec::new(),
+            })
+        })
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+    let mut thoughts = thought_rows
+        .into_iter()
+        .map(
+            |(id, subject_id, situation_id, content, confidence, created_at_ms)| {
+                let value: crate::domain::Thought = ThoughtRow {
+                    id,
+                    subject_id,
+                    situation_id,
+                    content,
+                    confidence,
+                    created_at_ms,
+                }
+                .try_into()?;
+                let state_token = initial_state_token("thought", value.id().as_str());
+                Ok(HistoryThoughtRecord {
+                    value,
+                    created_at_ms,
+                    state_token,
+                    corrections: Vec::new(),
+                })
+            },
+        )
+        .collect::<Result<Vec<_>, PersistenceError>>()?;
+
+    let has_any_data = !situations.is_empty()
+        || !observations.is_empty()
+        || !thoughts.is_empty()
+        || !situation_correction_rows.is_empty()
+        || !observation_correction_rows.is_empty()
+        || !thought_correction_rows.is_empty();
+    let Some(subject) = current_subject.as_ref() else {
+        if has_any_data {
+            return Err(structured_history_inconsistency(
+                "subject_id",
+                "inspect or correction records exist without a SelfSubject",
+            ));
+        }
+        return Ok(StructuredHistoryRecords {
+            situations,
+            observations,
+            thoughts,
+        });
+    };
+    if situations
+        .iter()
+        .any(|record| record.value.subject_id() != subject.id())
+        || observations
+            .iter()
+            .any(|record| record.value.subject_id() != subject.id())
+        || thoughts
+            .iter()
+            .any(|record| record.value.subject_id() != subject.id())
+    {
+        return Err(structured_history_inconsistency(
+            "subject_id",
+            "an inspect-scope record does not belong to the current SelfSubject",
+        ));
+    }
+
+    let situation_ids: HashSet<String> = situations
+        .iter()
+        .map(|record| record.value.id().as_str().to_owned())
+        .collect();
+    if observations.iter().any(|record| {
+        record
+            .value
+            .situation_id()
+            .is_some_and(|id| !situation_ids.contains(id.as_str()))
+    }) || thoughts.iter().any(|record| {
+        record
+            .value
+            .situation_id()
+            .is_some_and(|id| !situation_ids.contains(id.as_str()))
+    }) {
+        return Err(structured_history_inconsistency(
+            "situation_id",
+            "an inspect-scope relationship references a missing Situation",
+        ));
+    }
+
+    let mut situation_groups: HashMap<String, Vec<ValidatedSituationCorrection>> = HashMap::new();
+    for (
+        target_id,
+        subject_id,
+        sequence,
+        before,
+        after,
+        before_token,
+        after_token,
+        note,
+        recorded_at_ms,
+    ) in situation_correction_rows
+    {
+        if recorded_at_ms < 0 {
+            return Err(structured_history_inconsistency(
+                "recorded_at_ms",
+                "correction timestamp is negative",
+            ));
+        }
+        let target_id = reconstruct(
+            "SituationCorrection",
+            "situation_id",
+            crate::domain::SituationId::new(target_id),
+        )?;
+        let subject_id = reconstruct(
+            "SituationCorrection",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(subject_id),
+        )?;
+        if &subject_id != subject.id() {
+            return Err(structured_history_inconsistency(
+                "subject_id",
+                "a Situation correction has foreign subject ownership",
+            ));
+        }
+        crate::domain::Situation::new(target_id.clone(), subject_id.clone(), before.clone())
+            .map_err(|error| {
+                structured_history_inconsistency("before_description", error.to_string())
+            })?;
+        crate::domain::Situation::new(target_id.clone(), subject_id.clone(), after.clone())
+            .map_err(|error| {
+                structured_history_inconsistency("after_description", error.to_string())
+            })?;
+        situation_groups
+            .entry(target_id.as_str().to_owned())
+            .or_default()
+            .push(ValidatedSituationCorrection {
+                target_id,
+                subject_id,
+                sequence: checked_sequence("SituationCorrection", sequence)?,
+                before_description: before,
+                after_description: after,
+                before_state_token: checked_token(
+                    "SituationCorrection",
+                    "before_state_token",
+                    before_token,
+                )?,
+                after_state_token: checked_token(
+                    "SituationCorrection",
+                    "after_state_token",
+                    after_token,
+                )?,
+                user_note: checked_optional_note("SituationCorrection", note)?,
+            });
+    }
+
+    let mut observation_groups: HashMap<String, Vec<ValidatedObservationCorrection>> =
+        HashMap::new();
+    for (
+        target_id,
+        subject_id,
+        sequence,
+        before,
+        after,
+        before_situation,
+        after_situation,
+        before_token,
+        after_token,
+        note,
+        recorded_at_ms,
+    ) in observation_correction_rows
+    {
+        if recorded_at_ms < 0 {
+            return Err(structured_history_inconsistency(
+                "recorded_at_ms",
+                "correction timestamp is negative",
+            ));
+        }
+        let target_id = reconstruct(
+            "ObservationCorrection",
+            "observation_id",
+            crate::domain::ObservationId::new(target_id),
+        )?;
+        let subject_id = reconstruct(
+            "ObservationCorrection",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(subject_id),
+        )?;
+        if &subject_id != subject.id() {
+            return Err(structured_history_inconsistency(
+                "subject_id",
+                "an Observation correction has foreign subject ownership",
+            ));
+        }
+        let before_situation_id = before_situation
+            .map(crate::domain::SituationId::new)
+            .transpose()
+            .map_err(|error| {
+                structured_history_inconsistency("before_situation_id", error.to_string())
+            })?;
+        let after_situation_id = after_situation
+            .map(crate::domain::SituationId::new)
+            .transpose()
+            .map_err(|error| {
+                structured_history_inconsistency("after_situation_id", error.to_string())
+            })?;
+        crate::domain::Observation::new(
+            target_id.clone(),
+            subject_id.clone(),
+            before_situation_id.clone(),
+            before.clone(),
+        )
+        .map_err(|error| structured_history_inconsistency("before_content", error.to_string()))?;
+        crate::domain::Observation::new(
+            target_id.clone(),
+            subject_id.clone(),
+            after_situation_id.clone(),
+            after.clone(),
+        )
+        .map_err(|error| structured_history_inconsistency("after_content", error.to_string()))?;
+        observation_groups
+            .entry(target_id.as_str().to_owned())
+            .or_default()
+            .push(ValidatedObservationCorrection {
+                target_id,
+                subject_id,
+                sequence: checked_sequence("ObservationCorrection", sequence)?,
+                before_content: before,
+                after_content: after,
+                before_situation_id,
+                after_situation_id,
+                before_state_token: checked_token(
+                    "ObservationCorrection",
+                    "before_state_token",
+                    before_token,
+                )?,
+                after_state_token: checked_token(
+                    "ObservationCorrection",
+                    "after_state_token",
+                    after_token,
+                )?,
+                user_note: checked_optional_note("ObservationCorrection", note)?,
+            });
+    }
+
+    let mut thought_groups: HashMap<String, Vec<ValidatedThoughtCorrection>> = HashMap::new();
+    for (
+        target_id,
+        subject_id,
+        sequence,
+        before,
+        after,
+        before_situation,
+        after_situation,
+        before_confidence,
+        after_confidence,
+        before_token,
+        after_token,
+        note,
+        recorded_at_ms,
+    ) in thought_correction_rows
+    {
+        if recorded_at_ms < 0 {
+            return Err(structured_history_inconsistency(
+                "recorded_at_ms",
+                "correction timestamp is negative",
+            ));
+        }
+        let target_id = reconstruct(
+            "ThoughtCorrection",
+            "thought_id",
+            crate::domain::ThoughtId::new(target_id),
+        )?;
+        let subject_id = reconstruct(
+            "ThoughtCorrection",
+            "subject_id",
+            crate::domain::SelfSubjectId::new(subject_id),
+        )?;
+        if &subject_id != subject.id() {
+            return Err(structured_history_inconsistency(
+                "subject_id",
+                "a Thought correction has foreign subject ownership",
+            ));
+        }
+        let before_situation_id = before_situation
+            .map(crate::domain::SituationId::new)
+            .transpose()
+            .map_err(|error| {
+                structured_history_inconsistency("before_situation_id", error.to_string())
+            })?;
+        let after_situation_id = after_situation
+            .map(crate::domain::SituationId::new)
+            .transpose()
+            .map_err(|error| {
+                structured_history_inconsistency("after_situation_id", error.to_string())
+            })?;
+        let before_confidence = before_confidence
+            .map(|value| {
+                let value = percentage("ThoughtCorrection", "before_confidence", value)?;
+                reconstruct(
+                    "ThoughtCorrection",
+                    "before_confidence",
+                    crate::domain::ThoughtConfidence::new(value),
+                )
+            })
+            .transpose()?;
+        let after_confidence = after_confidence
+            .map(|value| {
+                let value = percentage("ThoughtCorrection", "after_confidence", value)?;
+                reconstruct(
+                    "ThoughtCorrection",
+                    "after_confidence",
+                    crate::domain::ThoughtConfidence::new(value),
+                )
+            })
+            .transpose()?;
+        crate::domain::Thought::new(
+            target_id.clone(),
+            subject_id.clone(),
+            before_situation_id.clone(),
+            before.clone(),
+            before_confidence,
+        )
+        .map_err(|error| structured_history_inconsistency("before_content", error.to_string()))?;
+        crate::domain::Thought::new(
+            target_id.clone(),
+            subject_id.clone(),
+            after_situation_id.clone(),
+            after.clone(),
+            after_confidence,
+        )
+        .map_err(|error| structured_history_inconsistency("after_content", error.to_string()))?;
+        thought_groups
+            .entry(target_id.as_str().to_owned())
+            .or_default()
+            .push(ValidatedThoughtCorrection {
+                target_id,
+                subject_id,
+                sequence: checked_sequence("ThoughtCorrection", sequence)?,
+                before_content: before,
+                after_content: after,
+                before_situation_id,
+                after_situation_id,
+                before_confidence,
+                after_confidence,
+                before_state_token: checked_token(
+                    "ThoughtCorrection",
+                    "before_state_token",
+                    before_token,
+                )?,
+                after_state_token: checked_token(
+                    "ThoughtCorrection",
+                    "after_state_token",
+                    after_token,
+                )?,
+                user_note: checked_optional_note("ThoughtCorrection", note)?,
+            });
+    }
+
+    validate_situation_chains(&mut situations, situation_groups)?;
+    validate_observation_chains(&mut observations, observation_groups, &situation_ids)?;
+    validate_thought_chains(&mut thoughts, thought_groups, &situation_ids)?;
+
+    Ok(StructuredHistoryRecords {
+        situations,
+        observations,
+        thoughts,
+    })
+}
+
+fn validate_situation_chains(
+    records: &mut [HistorySituationRecord],
+    mut groups: std::collections::HashMap<String, Vec<ValidatedSituationCorrection>>,
+) -> Result<(), PersistenceError> {
+    for record in records {
+        let Some(chain) = groups.remove(record.value.id().as_str()) else {
+            continue;
+        };
+        let mut expected_description: Option<&str> = None;
+        let mut expected_token = initial_state_token("situation", record.value.id().as_str());
+        for (index, correction) in chain.iter().enumerate() {
+            if correction.target_id != *record.value.id()
+                || correction.subject_id != *record.value.subject_id()
+                || u64::from(correction.sequence) != (index as u64) + 1
+                || correction.before_state_token != expected_token
+                || !valid_corrected_token("situation", &correction.after_state_token)
+                || correction.before_state_token == correction.after_state_token
+                || correction.before_description == correction.after_description
+                || expected_description.is_some_and(|value| value != correction.before_description)
+            {
+                return Err(structured_history_inconsistency(
+                    "situation_corrections",
+                    "Situation correction chain is broken",
+                ));
+            }
+            expected_description = Some(&correction.after_description);
+            expected_token = correction.after_state_token.clone();
+            record.corrections.push(SituationCorrectionRecord {
+                sequence: correction.sequence,
+                before_description: correction.before_description.clone(),
+                after_description: correction.after_description.clone(),
+                user_note: correction.user_note.clone(),
+            });
+        }
+        if expected_description != Some(record.value.description()) {
+            return Err(structured_history_inconsistency(
+                "situation_corrections",
+                "latest Situation correction does not match the current row",
+            ));
+        }
+        record.state_token = expected_token;
+    }
+    if groups.is_empty() {
+        Ok(())
+    } else {
+        Err(structured_history_inconsistency(
+            "situation_corrections",
+            "a Situation correction target is missing",
+        ))
+    }
+}
+
+fn validate_observation_chains(
+    records: &mut [HistoryObservationRecord],
+    mut groups: std::collections::HashMap<String, Vec<ValidatedObservationCorrection>>,
+    situation_ids: &std::collections::HashSet<String>,
+) -> Result<(), PersistenceError> {
+    for record in records {
+        let Some(chain) = groups.remove(record.value.id().as_str()) else {
+            continue;
+        };
+        let mut expected: Option<(&str, Option<&crate::domain::SituationId>)> = None;
+        let mut expected_token = initial_state_token("observation", record.value.id().as_str());
+        for (index, correction) in chain.iter().enumerate() {
+            if correction
+                .before_situation_id
+                .as_ref()
+                .is_some_and(|id| !situation_ids.contains(id.as_str()))
+                || correction
+                    .after_situation_id
+                    .as_ref()
+                    .is_some_and(|id| !situation_ids.contains(id.as_str()))
+                || correction.target_id != *record.value.id()
+                || correction.subject_id != *record.value.subject_id()
+                || u64::from(correction.sequence) != (index as u64) + 1
+                || correction.before_state_token != expected_token
+                || !valid_corrected_token("observation", &correction.after_state_token)
+                || correction.before_state_token == correction.after_state_token
+                || (correction.before_content == correction.after_content
+                    && correction.before_situation_id == correction.after_situation_id)
+                || expected.is_some_and(|value| {
+                    value
+                        != (
+                            correction.before_content.as_str(),
+                            correction.before_situation_id.as_ref(),
+                        )
+                })
+            {
+                return Err(structured_history_inconsistency(
+                    "observation_corrections",
+                    "Observation correction chain is broken",
+                ));
+            }
+            expected = Some((
+                correction.after_content.as_str(),
+                correction.after_situation_id.as_ref(),
+            ));
+            expected_token = correction.after_state_token.clone();
+            record.corrections.push(ObservationCorrectionRecord {
+                sequence: correction.sequence,
+                before_content: correction.before_content.clone(),
+                after_content: correction.after_content.clone(),
+                before_situation_id: correction.before_situation_id.clone(),
+                after_situation_id: correction.after_situation_id.clone(),
+                user_note: correction.user_note.clone(),
+            });
+        }
+        if expected != Some((record.value.content(), record.value.situation_id())) {
+            return Err(structured_history_inconsistency(
+                "observation_corrections",
+                "latest Observation correction does not match the current row",
+            ));
+        }
+        record.state_token = expected_token;
+    }
+    if groups.is_empty() {
+        Ok(())
+    } else {
+        Err(structured_history_inconsistency(
+            "observation_corrections",
+            "an Observation correction target is missing",
+        ))
+    }
+}
+
+fn validate_thought_chains(
+    records: &mut [HistoryThoughtRecord],
+    mut groups: std::collections::HashMap<String, Vec<ValidatedThoughtCorrection>>,
+    situation_ids: &std::collections::HashSet<String>,
+) -> Result<(), PersistenceError> {
+    for record in records {
+        let Some(chain) = groups.remove(record.value.id().as_str()) else {
+            continue;
+        };
+        type ThoughtState<'a> = (
+            &'a str,
+            Option<&'a crate::domain::SituationId>,
+            Option<crate::domain::ThoughtConfidence>,
+        );
+        let mut expected: Option<ThoughtState<'_>> = None;
+        let mut expected_token = initial_state_token("thought", record.value.id().as_str());
+        for (index, correction) in chain.iter().enumerate() {
+            if correction
+                .before_situation_id
+                .as_ref()
+                .is_some_and(|id| !situation_ids.contains(id.as_str()))
+                || correction
+                    .after_situation_id
+                    .as_ref()
+                    .is_some_and(|id| !situation_ids.contains(id.as_str()))
+                || correction.target_id != *record.value.id()
+                || correction.subject_id != *record.value.subject_id()
+                || u64::from(correction.sequence) != (index as u64) + 1
+                || correction.before_state_token != expected_token
+                || !valid_corrected_token("thought", &correction.after_state_token)
+                || correction.before_state_token == correction.after_state_token
+                || (correction.before_content == correction.after_content
+                    && correction.before_situation_id == correction.after_situation_id
+                    && correction.before_confidence == correction.after_confidence)
+                || expected.is_some_and(|value| {
+                    value
+                        != (
+                            correction.before_content.as_str(),
+                            correction.before_situation_id.as_ref(),
+                            correction.before_confidence,
+                        )
+                })
+            {
+                return Err(structured_history_inconsistency(
+                    "thought_corrections",
+                    "Thought correction chain is broken",
+                ));
+            }
+            expected = Some((
+                correction.after_content.as_str(),
+                correction.after_situation_id.as_ref(),
+                correction.after_confidence,
+            ));
+            expected_token = correction.after_state_token.clone();
+            record.corrections.push(ThoughtCorrectionRecord {
+                sequence: correction.sequence,
+                before_content: correction.before_content.clone(),
+                after_content: correction.after_content.clone(),
+                before_situation_id: correction.before_situation_id.clone(),
+                after_situation_id: correction.after_situation_id.clone(),
+                before_confidence: correction.before_confidence,
+                after_confidence: correction.after_confidence,
+                user_note: correction.user_note.clone(),
+            });
+        }
+        if expected
+            != Some((
+                record.value.content(),
+                record.value.situation_id(),
+                record.value.confidence(),
+            ))
+        {
+            return Err(structured_history_inconsistency(
+                "thought_corrections",
+                "latest Thought correction does not match the current row",
+            ));
+        }
+        record.state_token = expected_token;
+    }
+    if groups.is_empty() {
+        Ok(())
+    } else {
+        Err(structured_history_inconsistency(
+            "thought_corrections",
+            "a Thought correction target is missing",
+        ))
     }
 }
 
@@ -2917,6 +3975,8 @@ mod tests {
     const MIGRATION_0003: &str =
         include_str!("../migrations/0003_create_lived_experience_records.sql");
     const MIGRATION_0004: &str = include_str!("../migrations/0004_create_evidence_links.sql");
+    const MIGRATION_0005: &str =
+        include_str!("../migrations/0005_create_structured_corrections.sql");
 
     type ColumnExpectation = (&'static str, &'static str, i64, i64);
     type TableColumnExpectations = (&'static str, &'static [ColumnExpectation]);
@@ -2993,6 +4053,7 @@ mod tests {
         database.apply(MIGRATION_0002).await;
         database.apply(MIGRATION_0003).await;
         database.apply(MIGRATION_0004).await;
+        database.apply(MIGRATION_0005).await;
         database
     }
 
@@ -3471,11 +4532,14 @@ mod tests {
                     "emotions",
                     "evidence_links",
                     "memories",
+                    "observation_corrections",
                     "observations",
                     "outcomes",
                     "person_references",
                     "self_subjects",
+                    "situation_corrections",
                     "situations",
+                    "thought_corrections",
                     "thoughts",
                     "value_revisions",
                     "values",
@@ -3486,7 +4550,7 @@ mod tests {
                     .fetch_one(&database.pool)
                     .await
                     .unwrap();
-            assert_eq!(version, "4");
+            assert_eq!(version, "5");
             database.close().await;
         });
     }
@@ -3835,6 +4899,9 @@ mod tests {
                     "memories_id_subject_unique_idx",
                     "memories_situation_subject_idx",
                     "memories_subject_id_idx",
+                    "observation_corrections_after_situation_subject_idx",
+                    "observation_corrections_before_situation_subject_idx",
+                    "observation_corrections_subject_idx",
                     "observations_id_subject_unique_idx",
                     "observations_situation_subject_idx",
                     "observations_subject_id_idx",
@@ -3842,7 +4909,11 @@ mod tests {
                     "outcomes_id_subject_unique_idx",
                     "outcomes_subject_id_idx",
                     "person_references_subject_id_idx",
+                    "situation_corrections_subject_idx",
                     "situations_subject_id_idx",
+                    "thought_corrections_after_situation_subject_idx",
+                    "thought_corrections_before_situation_subject_idx",
+                    "thought_corrections_subject_idx",
                     "thoughts_id_subject_unique_idx",
                     "thoughts_situation_subject_idx",
                     "thoughts_subject_id_idx",

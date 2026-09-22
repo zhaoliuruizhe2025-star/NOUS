@@ -33,6 +33,12 @@ fn migrations() -> Vec<Migration> {
             sql: include_str!("../migrations/0004_create_evidence_links.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "create_structured_corrections",
+            sql: include_str!("../migrations/0005_create_structured_corrections.sql"),
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -51,7 +57,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::database_status,
             commands::save_structured_capture,
-            commands::load_structured_history
+            commands::load_structured_history,
+            commands::correct_structured_record
         ])
         .run(tauri::generate_context!())
         .expect("error while running NOUS");
@@ -65,7 +72,7 @@ mod tests {
     fn contains_the_registered_task_migrations() {
         let migrations = migrations();
 
-        assert_eq!(migrations.len(), 4);
+        assert_eq!(migrations.len(), 5);
         assert_eq!(migrations[0].version, 1);
         assert_eq!(migrations[0].description, "initialize_local_storage");
         assert!(migrations[0].sql.contains("app_metadata"));
@@ -80,5 +87,10 @@ mod tests {
         assert_eq!(migrations[3].version, 4);
         assert_eq!(migrations[3].description, "create_evidence_links");
         assert!(migrations[3].sql.contains("CREATE TABLE evidence_links"));
+        assert_eq!(migrations[4].version, 5);
+        assert_eq!(migrations[4].description, "create_structured_corrections");
+        assert!(migrations[4]
+            .sql
+            .contains("CREATE TABLE thought_corrections"));
     }
 }

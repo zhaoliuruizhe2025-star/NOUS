@@ -34,6 +34,16 @@ describe("localization", () => {
     expect(getMessages("zh-CN").history.order).toContain("不代表事情实际发生");
     expect(getMessages("en").history.conviction).toContain("you believed");
     expect(getMessages("zh-CN").history.conviction).toContain("你当时");
+    expect(Object.keys(getMessages("zh-CN").correction)).toEqual(
+      Object.keys(getMessages("en").correction),
+    );
+    expect(Object.keys(getMessages("zh-CN").correction.errors)).toEqual(
+      Object.keys(getMessages("en").correction.errors),
+    );
+    expect(getMessages("en").correction.explanation).toContain("changed later");
+    expect(getMessages("zh-CN").correction.explanation).toContain("后来真的发生了变化");
+    expect(getMessages("en").correction.priorMeaning).toContain("not true past user states");
+    expect(getMessages("zh-CN").correction.priorMeaning).toContain("并非用户真实的过去状态");
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {

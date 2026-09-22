@@ -1,12 +1,51 @@
 use crate::persistence::{
     HistoryObservationRecord, HistorySituationRecord, HistoryThoughtRecord, PersistenceError,
-    SqliteSelfModelRepository,
+    SqliteSelfModelRepository, StructuredHistoryRecords,
 };
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ContextReference {
+    pub(crate) id: String,
+    pub(crate) description: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SituationCorrectionView {
+    pub(crate) sequence: u32,
+    pub(crate) before_description: String,
+    pub(crate) after_description: String,
+    pub(crate) note: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ObservationCorrectionView {
+    pub(crate) sequence: u32,
+    pub(crate) before_content: String,
+    pub(crate) after_content: String,
+    pub(crate) before_context: Option<ContextReference>,
+    pub(crate) after_context: Option<ContextReference>,
+    pub(crate) note: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ThoughtCorrectionView {
+    pub(crate) sequence: u32,
+    pub(crate) before_content: String,
+    pub(crate) after_content: String,
+    pub(crate) before_context: Option<ContextReference>,
+    pub(crate) after_context: Option<ContextReference>,
+    pub(crate) before_subjective_conviction: Option<u8>,
+    pub(crate) after_subjective_conviction: Option<u8>,
+    pub(crate) note: Option<String>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct StructuredHistoryObservation {
     pub(crate) id: String,
     pub(crate) content: String,
+    pub(crate) state_token: String,
+    pub(crate) corrected: bool,
+    pub(crate) corrections: Vec<ObservationCorrectionView>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -14,12 +53,18 @@ pub(crate) struct StructuredHistoryThought {
     pub(crate) id: String,
     pub(crate) content: String,
     pub(crate) subjective_conviction: Option<u8>,
+    pub(crate) state_token: String,
+    pub(crate) corrected: bool,
+    pub(crate) corrections: Vec<ThoughtCorrectionView>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct StructuredHistoryContext {
     pub(crate) id: String,
     pub(crate) description: String,
+    pub(crate) state_token: String,
+    pub(crate) corrected: bool,
+    pub(crate) corrections: Vec<SituationCorrectionView>,
     pub(crate) observations: Vec<StructuredHistoryObservation>,
     pub(crate) thoughts: Vec<StructuredHistoryThought>,
 }
@@ -48,6 +93,29 @@ pub(crate) async fn load_structured_history(
 ) -> Result<StructuredHistory, StructuredHistoryError> {
     let records = repository.load_structured_history().await?;
 
+    assemble_structured_history(records)
+}
+
+pub(crate) fn assemble_structured_history(
+    records: StructuredHistoryRecords,
+) -> Result<StructuredHistory, StructuredHistoryError> {
+    let references = records
+        .situations
+        .iter()
+        .map(|record| ContextReference {
+            id: record.value.id().as_str().to_owned(),
+            description: record.value.description().to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let context_reference = |id: Option<&crate::domain::SituationId>| {
+        id.and_then(|id| {
+            references
+                .iter()
+                .find(|item| item.id == id.as_str())
+                .cloned()
+        })
+    };
+
     let mut contexts = records
         .situations
         .into_iter()
@@ -55,11 +123,24 @@ pub(crate) async fn load_structured_history(
             |HistorySituationRecord {
                  value,
                  created_at_ms,
+                 state_token,
+                 corrections,
              }| {
                 let _storage_order = created_at_ms;
                 StructuredHistoryContext {
                     id: value.id().as_str().to_owned(),
                     description: value.description().to_owned(),
+                    state_token,
+                    corrected: !corrections.is_empty(),
+                    corrections: corrections
+                        .into_iter()
+                        .map(|item| SituationCorrectionView {
+                            sequence: item.sequence,
+                            before_description: item.before_description,
+                            after_description: item.after_description,
+                            note: item.user_note,
+                        })
+                        .collect(),
                     observations: Vec::new(),
                     thoughts: Vec::new(),
                 }
@@ -72,12 +153,27 @@ pub(crate) async fn load_structured_history(
     for HistoryObservationRecord {
         value,
         created_at_ms,
+        state_token,
+        corrections,
     } in records.observations
     {
         let _storage_order = created_at_ms;
         let observation = StructuredHistoryObservation {
             id: value.id().as_str().to_owned(),
             content: value.content().to_owned(),
+            state_token,
+            corrected: !corrections.is_empty(),
+            corrections: corrections
+                .into_iter()
+                .map(|item| ObservationCorrectionView {
+                    sequence: item.sequence,
+                    before_content: item.before_content,
+                    after_content: item.after_content,
+                    before_context: context_reference(item.before_situation_id.as_ref()),
+                    after_context: context_reference(item.after_situation_id.as_ref()),
+                    note: item.user_note,
+                })
+                .collect(),
         };
         if let Some(situation_id) = value.situation_id() {
             let context = contexts
@@ -93,6 +189,8 @@ pub(crate) async fn load_structured_history(
     for HistoryThoughtRecord {
         value,
         created_at_ms,
+        state_token,
+        corrections,
     } in records.thoughts
     {
         let _storage_order = created_at_ms;
@@ -100,6 +198,21 @@ pub(crate) async fn load_structured_history(
             id: value.id().as_str().to_owned(),
             content: value.content().to_owned(),
             subjective_conviction: value.confidence().map(|confidence| confidence.value()),
+            state_token,
+            corrected: !corrections.is_empty(),
+            corrections: corrections
+                .into_iter()
+                .map(|item| ThoughtCorrectionView {
+                    sequence: item.sequence,
+                    before_content: item.before_content,
+                    after_content: item.after_content,
+                    before_context: context_reference(item.before_situation_id.as_ref()),
+                    after_context: context_reference(item.after_situation_id.as_ref()),
+                    before_subjective_conviction: item.before_confidence.map(|value| value.value()),
+                    after_subjective_conviction: item.after_confidence.map(|value| value.value()),
+                    note: item.user_note,
+                })
+                .collect(),
         };
         if let Some(situation_id) = value.situation_id() {
             let context = contexts
@@ -157,6 +270,7 @@ mod tests {
             include_str!("../../migrations/0002_create_self_model.sql"),
             include_str!("../../migrations/0003_create_lived_experience_records.sql"),
             include_str!("../../migrations/0004_create_evidence_links.sql"),
+            include_str!("../../migrations/0005_create_structured_corrections.sql"),
         ] {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
         }
@@ -415,6 +529,7 @@ mod tests {
                 include_str!("../../migrations/0002_create_self_model.sql"),
                 include_str!("../../migrations/0003_create_lived_experience_records.sql"),
                 include_str!("../../migrations/0004_create_evidence_links.sql"),
+                include_str!("../../migrations/0005_create_structured_corrections.sql"),
             ] {
                 sqlx::raw_sql(migration).execute(&pool).await.unwrap();
             }
@@ -447,8 +562,10 @@ mod tests {
             let history = load_structured_history(&repository).await.unwrap();
             assert_eq!(history.standalone_thoughts[0].id, "durable-thought");
 
+            drop(repository);
             reopened.close().await;
-            fs::remove_dir_all(directory).unwrap();
+            drop(reopened);
+            let _ = fs::remove_dir_all(directory);
         });
     }
 }

@@ -30,19 +30,19 @@ describe("structured history inspect boundary", () => {
     expect(isStructuredHistoryEmpty(history())).toBe(true);
     expect(
       isStructuredHistoryEmpty(
-        history({ contexts: [{ id: "s", description: "Context", observations: [], thoughts: [] }] }),
+        history({ contexts: [{ id: "s", description: "Context", stateToken: "initial:situation:s", corrected: false, corrections: [], observations: [], thoughts: [] }] }),
       ),
     ).toBe(false);
     expect(
       isStructuredHistoryEmpty(
-        history({ standaloneObservations: [{ id: "o", content: "A report" }] }),
+        history({ standaloneObservations: [{ id: "o", content: "A report", stateToken: "initial:observation:o", corrected: false, corrections: [] }] }),
       ),
     ).toBe(false);
     expect(
       isStructuredHistoryEmpty(
         history({
           standaloneThoughts: [
-            { id: "t", content: "A thought", subjectiveConviction: null },
+            { id: "t", content: "A thought", subjectiveConviction: null, stateToken: "initial:thought:t", corrected: false, corrections: [] },
           ],
         }),
       ),
@@ -58,7 +58,7 @@ describe("structured history inspect boundary", () => {
     expect(api).not.toContain("createdAt");
     expect(api).not.toMatch(/invoke<StructuredHistory>\([^)]*,\s*\{/);
     expect(component.match(/loadStructuredHistory\(/g)).toHaveLength(1);
-    expect(component).not.toMatch(/\b(?:save|edit|delete|correct|promote)\w*\s*\(/i);
+    expect(component).not.toMatch(/\b(?:save|edit|delete|promote)\w*\s*\(/i);
   });
 
   it("presents only repository-assembled relationships and hides opaque metadata", () => {
@@ -80,7 +80,7 @@ describe("structured history inspect boundary", () => {
     const component = readRepositoryFile("src/components/StructuredHistory.tsx");
 
     expect(component).toContain("thought.subjectiveConviction !== null");
-    expect(component).toContain('convictionCopy.replace(');
+    expect(component).toContain('messages.history.conviction.replace(');
     expect(component).not.toContain("NOUS confidence");
     expect(component).not.toContain("probability");
   });

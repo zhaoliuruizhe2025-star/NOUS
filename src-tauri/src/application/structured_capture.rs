@@ -183,6 +183,7 @@ mod tests {
             include_str!("../../migrations/0002_create_self_model.sql"),
             include_str!("../../migrations/0003_create_lived_experience_records.sql"),
             include_str!("../../migrations/0004_create_evidence_links.sql"),
+            include_str!("../../migrations/0005_create_structured_corrections.sql"),
         ] {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
         }

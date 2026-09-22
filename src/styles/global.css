@@ -419,6 +419,46 @@ textarea {
   color: #8b4f49;
 }
 
+.history-record-actions {
+  margin: 8px 0 12px;
+}
+
+.correction-provenance {
+  margin: 8px 0;
+  color: #5d6a64;
+  font-size: 0.86rem;
+}
+
+.correction-provenance summary {
+  cursor: pointer;
+}
+
+.correction-provenance li {
+  margin: 12px 0;
+}
+
+.correction-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.correction-form textarea,
+.correction-form select,
+.correction-form input {
+  width: 100%;
+  border: 1px solid #cbd0c9;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgb(255 255 255 / 76%);
+  color: #26312e;
+  font: inherit;
+}
+
+.correction-form label {
+  font-weight: 600;
+}
+
 .saved-records ul {
   padding-left: 20px;
 }
