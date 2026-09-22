@@ -81,5 +81,44 @@
       "storageUnavailable": "本地存储尚未就绪。",
       "loadFailed": "无法加载已保存的记录。"
     }
+  },
+  "correction": {
+    "open": "纠正不准确的记录",
+    "title": "纠正不准确的记录",
+    "explanation": "这里用于修正 NOUS 当时存错或表示不准确的内容。如果你后来真的发生了变化，请新增记录，不要改写过去。这不是删除记录。",
+    "contextText": "纠正背景表述",
+    "recordText": "纠正保存的内容",
+    "context": "关联的已保存背景",
+    "noContext": "不关联已保存背景",
+    "conviction": "你当时对这个想法的确信程度（可留空，0–100）",
+    "note": "纠正说明（可留空）",
+    "cancel": "取消",
+    "confirm": "确认纠正",
+    "saving": "正在保存纠正……",
+    "reload": "重新加载已保存记录",
+    "corrected": "已纠正 · 查看纠正来源",
+    "priorMeaning": "旧值是 NOUS 曾经保存的不准确表示，并非用户真实的过去状态。背景标签指向同一条已保存背景，显示的是它当前的文字。",
+    "sequence": "第 {value} 次纠正",
+    "before": "先前不准确的表示",
+    "after": "纠正后的表示",
+    "beforeContext": "先前关联的背景",
+    "afterContext": "纠正后关联的背景",
+    "beforeConviction": "先前保存的主观确信程度",
+    "afterConviction": "纠正后的主观确信程度",
+    "notReported": "未提供",
+    "noteDisplay": "你的说明",
+    "errors": {
+      "targetNotFound": "找不到这条已保存记录，没有保存纠正。",
+      "invalidCorrection": "请检查纠正内容、背景和确信程度。",
+      "noChanges": "纠正后的表示没有变化，因此没有保存纠正。",
+      "staleCorrection": "打开后这条记录发生了变化，请重新加载后再确认纠正。",
+      "evidenceReferenceBlocked": "这条记录已被用作用户明确建立的证据来源，因此暂不能在这里纠正。没有保存任何更改。",
+      "subjectInvariant": "本地用户记录不一致，没有保存纠正。",
+      "dataInconsistent": "已保存的记录不一致，没有保存纠正。",
+      "storageUnavailable": "本地存储尚未就绪，没有保存纠正。",
+      "correctionConflict": "纠正与本地数据发生冲突，没有保存任何更改。",
+      "clockUnavailable": "当前时间不可用，没有保存纠正。",
+      "saveFailed": "纠正未能保存，也没有保留部分更改。"
+    }
   }
 }

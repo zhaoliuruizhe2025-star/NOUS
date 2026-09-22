@@ -37,7 +37,7 @@ describe("frontend database security boundary", () => {
       'invoke<DatabaseStatusResponse>("database_status")',
     );
     expect(databaseSource).not.toMatch(/invoke[^;]*,\s*\{/);
-    expect(databaseSource).toContain("status.schemaVersion !== 4");
+    expect(databaseSource).toContain("status.schemaVersion !== 5");
   });
 
   it("grants the frontend no SQL load, select, or execute capability", () => {
@@ -68,6 +68,9 @@ describe("frontend database security boundary", () => {
     );
     expect(librarySource).toContain("commands::save_structured_capture");
     expect(librarySource).toContain("commands::load_structured_history");
+    expect(librarySource).toContain("commands::correct_structured_record");
+    expect(commandSource).toContain("enum CorrectStructuredRecordRequest");
+    expect(commandSource).toContain("deny_unknown_fields");
     expect(commandSource).toMatch(
       /async fn load_structured_history\(\s*database: State<'_, SharedSqlitePool>,?\s*\)/,
     );

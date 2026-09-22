@@ -7,7 +7,61 @@ import {
   type StructuredHistory as StructuredHistoryData,
   type StructuredHistoryCommandError,
   type StructuredHistoryThought,
+  type StructuredHistoryObservation,
 } from "../app/history";
+import { StructuredCorrection, type CorrectableRecord } from "./StructuredCorrection";
+
+function RecordActions({ selected, messages, onCorrect }: {
+  selected: CorrectableRecord;
+  messages: Messages;
+  onCorrect: (record: CorrectableRecord) => void;
+}) {
+  const copy = messages.correction;
+  return (
+    <div className="history-record-actions">
+      {selected.record.corrected && <details className="correction-provenance">
+        <summary>{copy.corrected}</summary>
+        <p>{copy.priorMeaning}</p>
+        <ol>{selected.kind === "situation"
+          ? selected.record.corrections.map((item) => <li key={item.sequence}>
+              <strong>{copy.sequence.replace("{value}", String(item.sequence))}</strong>
+              <p>{copy.before}: {item.beforeDescription}</p>
+              <p>{copy.after}: {item.afterDescription}</p>
+              {item.note && <p>{copy.noteDisplay}: {item.note}</p>}
+            </li>)
+          : selected.kind === "observation"
+            ? selected.record.corrections.map((item) => <li key={item.sequence}>
+                <strong>{copy.sequence.replace("{value}", String(item.sequence))}</strong>
+                <p>{copy.before}: {item.beforeContent}</p>
+                <p>{copy.after}: {item.afterContent}</p>
+                <p>{copy.beforeContext}: {item.beforeContext?.description ?? copy.noContext}</p>
+                <p>{copy.afterContext}: {item.afterContext?.description ?? copy.noContext}</p>
+                {item.note && <p>{copy.noteDisplay}: {item.note}</p>}
+              </li>)
+            : selected.record.corrections.map((item) => <li key={item.sequence}>
+                <strong>{copy.sequence.replace("{value}", String(item.sequence))}</strong>
+                <p>{copy.before}: {item.beforeContent}</p>
+                <p>{copy.after}: {item.afterContent}</p>
+                <p>{copy.beforeContext}: {item.beforeContext?.description ?? copy.noContext}</p>
+                <p>{copy.afterContext}: {item.afterContext?.description ?? copy.noContext}</p>
+                <p>{copy.beforeConviction}: {item.beforeSubjectiveConviction ?? copy.notReported}</p>
+                <p>{copy.afterConviction}: {item.afterSubjectiveConviction ?? copy.notReported}</p>
+                {item.note && <p>{copy.noteDisplay}: {item.note}</p>}
+              </li>)}</ol>
+      </details>}
+      <button type="button" className="text-button" onClick={() => onCorrect(selected)}>{copy.open}</button>
+    </div>
+  );
+}
+
+function ObservationItem({ observation, contextId, messages, onCorrect }: {
+  observation: StructuredHistoryObservation;
+  contextId: string | null;
+  messages: Messages;
+  onCorrect: (record: CorrectableRecord) => void;
+}) {
+  return <li><p>{observation.content}</p><RecordActions selected={{ kind: "observation", record: observation, contextId }} messages={messages} onCorrect={onCorrect} /></li>;
+}
 
 type HistoryState =
   | { status: "loading" }
@@ -23,22 +77,27 @@ function errorCode(error: unknown): string {
 
 function ThoughtItem({
   thought,
-  convictionCopy,
+  contextId,
+  messages,
+  onCorrect,
 }: {
   thought: StructuredHistoryThought;
-  convictionCopy: string;
+  contextId: string | null;
+  messages: Messages;
+  onCorrect: (record: CorrectableRecord) => void;
 }) {
   return (
     <li>
       <p>{thought.content}</p>
       {thought.subjectiveConviction !== null && (
         <small>
-          {convictionCopy.replace(
+          {messages.history.conviction.replace(
             "{value}",
             String(thought.subjectiveConviction),
           )}
         </small>
       )}
+      <RecordActions selected={{ kind: "thought", record: thought, contextId }} messages={messages} onCorrect={onCorrect} />
     </li>
   );
 }
@@ -47,6 +106,13 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
   const copy = messages.history;
   const [state, setState] = useState<HistoryState>({ status: "loading" });
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [selected, setSelected] = useState<CorrectableRecord | null>(null);
+
+  function reload() {
+    setSelected(null);
+    setState({ status: "loading" });
+    setLoadAttempt((attempt) => attempt + 1);
+  }
 
   useEffect(() => {
     let active = true;
@@ -82,21 +148,30 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
           <button
             className="secondary-button"
             type="button"
-            onClick={() => {
-              setState({ status: "loading" });
-              setLoadAttempt((attempt) => attempt + 1);
-            }}
+            onClick={reload}
           >
             {copy.retry}
           </button>
         </div>
       )}
 
-      {state.status === "loaded" && isStructuredHistoryEmpty(state.history) && (
+      {state.status === "loaded" && selected && (
+        <StructuredCorrection
+          key={`${selected.kind}:${selected.record.id}:${selected.record.stateToken}`}
+          selected={selected}
+          contexts={state.history.contexts}
+          messages={messages}
+          onCancel={() => setSelected(null)}
+          onStale={reload}
+          onSaved={(history) => { setState({ status: "loaded", history }); setSelected(null); }}
+        />
+      )}
+
+      {state.status === "loaded" && !selected && isStructuredHistoryEmpty(state.history) && (
         <p className="history-empty">{copy.empty}</p>
       )}
 
-      {state.status === "loaded" && !isStructuredHistoryEmpty(state.history) && (
+      {state.status === "loaded" && !selected && !isStructuredHistoryEmpty(state.history) && (
         <div className="history-records">
           {state.history.contexts.length > 0 && (
             <section aria-labelledby="history-contexts-title">
@@ -105,12 +180,13 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
                 {state.history.contexts.map((context) => (
                   <article className="history-context" key={context.id}>
                     <h3>{context.description}</h3>
+                    <RecordActions selected={{ kind: "situation", record: context }} messages={messages} onCorrect={setSelected} />
                     {context.observations.length > 0 && (
                       <section>
                         <h4>{copy.observations}</h4>
                         <ul>
                           {context.observations.map((observation) => (
-                            <li key={observation.id}>{observation.content}</li>
+                            <ObservationItem key={observation.id} observation={observation} contextId={context.id} messages={messages} onCorrect={setSelected} />
                           ))}
                         </ul>
                       </section>
@@ -123,7 +199,9 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
                             <ThoughtItem
                               key={thought.id}
                               thought={thought}
-                              convictionCopy={copy.conviction}
+                              contextId={context.id}
+                              messages={messages}
+                              onCorrect={setSelected}
                             />
                           ))}
                         </ul>
@@ -140,7 +218,7 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
               <h2>{copy.standaloneObservations}</h2>
               <ul>
                 {state.history.standaloneObservations.map((observation) => (
-                  <li key={observation.id}>{observation.content}</li>
+                  <ObservationItem key={observation.id} observation={observation} contextId={null} messages={messages} onCorrect={setSelected} />
                 ))}
               </ul>
             </section>
@@ -154,7 +232,9 @@ export function StructuredHistory({ messages }: { messages: Messages }) {
                   <ThoughtItem
                     key={thought.id}
                     thought={thought}
-                    convictionCopy={copy.conviction}
+                    contextId={null}
+                    messages={messages}
+                    onCorrect={setSelected}
                   />
                 ))}
               </ul>
