@@ -164,7 +164,7 @@ Future design must follow [REASONING_MODEL.md](REASONING_MODEL.md) for evidence-
 
 The Owner-approved [Task 012 Connect architecture](TASK_012_DESIGN.md) fixes Candidate as a reviewable possible recurring structure, Hypothesis as a reasoning role rather than a durable entity, and Pattern as a validated, explicitly user-accepted, context- and time-bounded durable interpretation. Task 013 Transient Candidate Review Foundation is complete: the user proposes wording and selects current Situation, Observation, or Thought records, can mark evidence roles and adjust claim/scope, and retains no Candidate, Pattern, or Hypothesis after the review.
 
-The Owner-approved [Task 014 system-proposed Candidate architecture](TASK_014_DESIGN.md) finds that current records and approved mechanisms cannot support autonomous psychological-semantic Candidate generation. Structural association cannot be presented as psychological meaning. That capability remains unauthorized. Task 015 is complete at `f937936`: it delivered the strictly transient, user-assisted semantic comparison foundation, without persistent labels or a local semantic model. Task 016 is the next architecture task and has not started.
+The Owner-approved [Task 014 system-proposed Candidate architecture](TASK_014_DESIGN.md) finds that current records and approved mechanisms cannot support autonomous psychological-semantic Candidate generation. Structural association cannot be presented as psychological meaning. Task 015 is complete at `f937936`: it delivered the strictly transient, user-assisted semantic comparison foundation, without persistent labels or a local semantic model. The [Task 016 architecture](TASK_016_DESIGN.md) is Owner-approved for documentation review: Task 015 comparisons do not directly authorize a system Candidate because they omit the specific shared meaning and Candidate-relative validation. Candidate System feasibility is not rejected. The preferred next direction is to design one complete, deterministic User-Grounded Candidate System v1 mechanism, followed after any separately approved implementation by a Candidate Product Test of correctness, system cognitive contribution, and interaction cost. Direct generation and v1 implementation remain unauthorized; Task 017 has not started. A local semantic model is only a separately reviewed future option if product evidence warrants it.
 
 Likely task slices:
 
@@ -299,4 +299,4 @@ implementation complete
 - v0.2 master planning checkpoint: **COMPLETE** at `8d9770d`.
 - Task 002: **COMPLETE** at `e324852`.
 - Task 003: **COMPLETE** at `e970138`.
-- Task 004 and later: **roadmap summaries only; not authorized for implementation**.
+- Phase B: **CLOSED**. Tasks 012–015: **COMPLETE**. Task 016 Stage 1 architecture: **OWNER APPROVED**; its documentation checkpoint awaits Owner review, approval, and merge. Task 017: **NOT STARTED**; no Candidate v1 implementation is authorized.
