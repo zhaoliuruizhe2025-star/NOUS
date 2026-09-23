@@ -591,6 +591,75 @@ textarea {
 .candidate-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
 .candidate-card :is(button, select, textarea, input):focus-visible { outline: 2px solid #6f867d; outline-offset: 2px; }
 
+.semantic-card {
+  width: min(900px, 100%);
+  margin: clamp(60px, 12vh, 110px) auto 0;
+  padding: clamp(28px, 5vw, 52px);
+  border: 1px solid rgb(64 82 75 / 14%);
+  border-radius: 28px;
+  background: rgb(255 255 255 / 72%);
+  box-shadow: 0 22px 60px rgb(50 60 56 / 8%);
+}
+.semantic-card h1 {
+  margin: 0;
+  color: #23302c;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 400;
+}
+.semantic-intro,
+.semantic-boundary,
+.semantic-frame p,
+.semantic-browser > p,
+.semantic-guidance,
+.semantic-source-context,
+.semantic-limitations { color: #66726d; line-height: 1.6; }
+.semantic-boundary { font-weight: 600; }
+.semantic-mode { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; border: 0; padding: 0; }
+.semantic-mode legend { margin-bottom: 10px; font-weight: 600; }
+.semantic-mode label,
+.semantic-anchor-choice,
+.semantic-source-choice { display: flex; align-items: flex-start; gap: 10px; }
+.semantic-frame { display: grid; gap: 8px; margin-top: 24px; }
+.semantic-frame label { font-weight: 600; }
+.semantic-frame textarea,
+.semantic-question select {
+  width: 100%;
+  border: 1px solid #cbd0c9;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #26312e;
+  background: rgb(255 255 255 / 85%);
+}
+.semantic-frame textarea { resize: vertical; line-height: 1.55; }
+.semantic-frame p { margin: 0; font-size: 0.88rem; }
+.semantic-browser,
+.semantic-questions { margin-top: 32px; }
+.semantic-source-list,
+.semantic-summary ul { padding-left: 22px; }
+.semantic-source,
+.semantic-question,
+.semantic-summary li { margin: 14px 0; padding: 16px; border-radius: 14px; background: rgb(238 241 236 / 80%); }
+.semantic-source-choice span,
+.semantic-compared-content,
+.semantic-questions blockquote,
+.semantic-user-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.semantic-source-context { margin: 8px 0 0; font-size: 0.88rem; }
+.semantic-anchor-choice { margin-top: 12px; font-weight: 600; }
+.semantic-questions blockquote { margin: 12px 0; padding-left: 16px; border-left: 3px solid #9eada4; }
+.semantic-question label { display: grid; gap: 8px; margin-top: 18px; font-weight: 600; }
+.semantic-question select { max-width: 440px; font-weight: 400; }
+.semantic-relation-title { margin-top: 0; font-weight: 600; }
+.semantic-error { margin-top: 18px; color: #8b4f49; }
+.semantic-error li { margin: 8px 0; }
+.semantic-error .text-button { margin-left: 10px; }
+.semantic-summary { margin-top: 30px; padding: 24px; border-radius: 18px; background: rgb(238 241 236 / 80%); }
+.semantic-summary h3 { margin-bottom: 8px; }
+.semantic-summary li p { margin: 8px 0; }
+.semantic-limitations { margin: 24px 0; }
+.semantic-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
+.semantic-card :is(button, select, textarea, input):focus-visible { outline: 2px solid #6f867d; outline-offset: 2px; }
+
 @media (max-width: 560px) {
   .app-header {
     align-items: flex-start;
@@ -614,6 +683,12 @@ textarea {
   }
 
   .candidate-card {
+    margin-top: 42px;
+    padding: 24px 18px;
+    border-radius: 20px;
+  }
+
+  .semantic-card {
     margin-top: 42px;
     padding: 24px 18px;
     border-radius: 20px;

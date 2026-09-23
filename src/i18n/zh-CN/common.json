@@ -18,7 +18,8 @@
     "capture": "记录",
     "history": "已保存的记录",
     "portability": "导出与备份",
-    "candidate": "候选模式审阅"
+    "candidate": "候选模式审阅",
+    "comparison": "比较记录"
   },
   "capture": {
     "eyebrow": "记住",
@@ -82,6 +83,74 @@
       "dataInconsistent": "部分已保存记录不一致，因此无法安全展示此页面。",
       "storageUnavailable": "本地存储尚未就绪。",
       "loadFailed": "无法加载已保存的记录。"
+    }
+  },
+  "semanticComparison": {
+    "eyebrow": "连接 · 由你比较",
+    "title": "比较记录",
+    "intro": "选择已保存的想法或经历细节，再说明每条记录与你指定的比较起点有什么关系。这些判断只用于本次比较。",
+    "notSaved": "本次比较不会保存。离开此页面或重新加载应用后，比较内容会消失。",
+    "modeLabel": "选择一种记录类型",
+    "sourceTypes": {
+      "thought": "想法",
+      "observation": "经历细节"
+    },
+    "frameLabel": "这次想从什么角度比较？",
+    "frameGuidance": "写下本次比较的角度。回答问题后修改角度，会清空已有答案；选中的记录会保留。",
+    "sourcesTitle": "选择当前已保存的记录",
+    "loading": "正在读取当前已保存的记录……",
+    "retry": "重试",
+    "chooseMode": "选择“想法”或“经历细节”，查看可用记录。",
+    "noThoughts": "目前没有可供本次比较的已保存想法。",
+    "noObservations": "目前没有可供本次比较的已保存经历细节。",
+    "linkedSituation": "关联情境背景",
+    "noLinkedSituation": "没有关联的情境背景",
+    "anchorLabel": "作为比较起点的记录",
+    "staleNotice": "一条选中的记录已变化。先前的内容和答案不再使用；请重新选择当前记录后再比较。",
+    "sourceChanged": "选中的记录已变化",
+    "removeStale": "移除旧选择",
+    "needAnother": "请再选择至少一条记录进行比较。",
+    "questionsTitle": "你的逐项比较",
+    "anchorIntro": "下面每条记录只与这条比较起点比较：",
+    "anchorRelation": "比较起点 ↔ 这条记录",
+    "comparabilityQuestion": "就你填写的角度，比较这两条记录有意义吗？",
+    "comparability": {
+      "comparable": "就这个角度可以比较",
+      "notComparable": "就这个角度不适合比较",
+      "cannotTell": "无法判断"
+    },
+    "meaningQuestion": "在这个角度下，它们表达的内容是什么关系？",
+    "meaning": {
+      "similar": "在这个角度下表达的内容相近",
+      "materiallyDifferent": "在这个角度下有实质差异",
+      "cannotTell": "无法判断"
+    },
+    "experienceQuestion": "这两条记录可能描述同一次经历吗？",
+    "experience": {
+      "sameOrPossiblySame": "同一次或可能是同一次经历",
+      "differentExperiences": "不同经历",
+      "cannotTell": "无法判断"
+    },
+    "unanswered": "尚未回答",
+    "checking": "正在核对当前记录……",
+    "summaryInvalid": "先前的审阅摘要已不再是当前结果。请检查当前记录和保留的答案，再重新审阅。",
+    "incomplete": "请指定比较起点并回答每个适用的问题，然后查看摘要。“无法判断”也是完整答案。",
+    "summaryTitle": "你的结构化比较",
+    "sourceTypeLabel": "记录类型",
+    "comparisonsTitle": "分别与比较起点的关系",
+    "comparabilityLabel": "你标记的可比性",
+    "meaningLabel": "你标记的含义关系",
+    "experienceLabel": "你标记的经历关系",
+    "limitations": "这些是你就本次比较角度、只针对所选记录作出的判断。每项关系仅涉及比较起点；未推断其他记录之间的关系。不同经历不证明证据独立。NOUS 未推断重复出现、候选模式、已确认模式、因果、信心强度或事件先后。本次比较不会保存。",
+    "continueEditing": "继续修改",
+    "review": "查看比较摘要",
+    "clear": "清空比较",
+    "close": "关闭",
+    "errors": {
+      "subjectInvariant": "本地用户记录不一致，无法读取当前记录。",
+      "dataInconsistent": "已保存的记录不一致，无法安全地加载本次比较。",
+      "storageUnavailable": "本地存储尚未就绪。",
+      "loadFailed": "无法读取当前已保存的记录。先前的摘要不再视为当前有效。"
     }
   },
   "candidateReview": {

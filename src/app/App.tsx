@@ -5,6 +5,7 @@ import { StructuredCapture } from "../components/StructuredCapture";
 import { StructuredHistory } from "../components/StructuredHistory";
 import { DataPortability } from "../components/DataPortability";
 import { CandidateReview } from "../components/CandidateReview";
+import { SemanticComparison } from "../components/SemanticComparison";
 import {
   getMessages,
   resolveInitialLocale,
@@ -13,7 +14,7 @@ import {
 import { initializeDatabase } from "./database";
 
 type DatabaseStatus = "initializing" | "ready" | "error";
-type AppView = "capture" | "history" | "portability" | "candidate";
+type AppView = "capture" | "history" | "portability" | "candidate" | "comparison";
 
 export function App() {
   const [locale, setLocale] = useState<Locale>(() =>
@@ -91,6 +92,14 @@ export function App() {
             >
               {messages.navigation.candidate}
             </button>
+            <button
+              className={view === "comparison" ? "view-switcher__active" : ""}
+              type="button"
+              aria-current={view === "comparison" ? "page" : undefined}
+              onClick={() => setView("comparison")}
+            >
+              {messages.navigation.comparison}
+            </button>
           </nav>
           {view === "capture" ? (
             <StructuredCapture messages={messages} />
@@ -98,8 +107,10 @@ export function App() {
             <StructuredHistory messages={messages} />
           ) : view === "portability" ? (
             <DataPortability messages={messages} />
-          ) : (
+          ) : view === "candidate" ? (
             <CandidateReview messages={messages} onClose={() => setView("history")} />
+          ) : (
+            <SemanticComparison messages={messages} onClose={() => setView("history")} />
           )}
         </>
       ) : (

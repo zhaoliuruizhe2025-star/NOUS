@@ -85,6 +85,24 @@ describe("localization", () => {
     expect(getMessages("zh-CN").candidateReview.dependence).toContain("不证明证据独立");
     expect(getMessages("en").candidateReview.noChronology).toContain("Save order does not establish");
     expect(getMessages("zh-CN").candidateReview.noChronology).toContain("保存顺序不能说明");
+    expect(Object.keys(getMessages("zh-CN").semanticComparison)).toEqual(
+      Object.keys(getMessages("en").semanticComparison),
+    );
+    for (const key of ["sourceTypes", "comparability", "meaning", "experience", "errors"] as const) {
+      expect(Object.keys(getMessages("zh-CN").semanticComparison[key])).toEqual(
+        Object.keys(getMessages("en").semanticComparison[key]),
+      );
+    }
+    expect(getMessages("en").semanticComparison.anchorLabel).toBe("Record to compare others with");
+    expect(getMessages("zh-CN").semanticComparison.anchorLabel).toBe("作为比较起点的记录");
+    expect(getMessages("en").semanticComparison.unanswered).toBe("Not answered");
+    expect(getMessages("zh-CN").semanticComparison.unanswered).toBe("尚未回答");
+    expect(getMessages("en").semanticComparison.comparability.cannotTell).toBe("Cannot tell");
+    expect(getMessages("zh-CN").semanticComparison.comparability.cannotTell).toBe("无法判断");
+    expect(getMessages("en").semanticComparison.limitations).toContain("no relation among the other records");
+    expect(getMessages("zh-CN").semanticComparison.limitations).toContain("未推断其他记录之间的关系");
+    expect(getMessages("en").semanticComparison.limitations).toContain("do not establish independent evidence");
+    expect(getMessages("zh-CN").semanticComparison.limitations).toContain("不证明证据独立");
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {
