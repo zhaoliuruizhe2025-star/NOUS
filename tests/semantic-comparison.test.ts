@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { StructuredHistory } from "../src/app/history";
+import { handoffFromReviewedComparison } from "../src/app/thought_recurrence_candidate";
 import {
   addSource,
   answerComparability,
@@ -233,6 +234,19 @@ describe("Task 015 source invalidation", () => {
 });
 
 describe("Task 015 async, summary and lifecycle boundary", () => {
+  it("offers Task 017 only from a reviewed Thought comparison and hands off typed current sources", () => {
+    const thoughtDraft = answered(chooseAnchor(draftWith("t1", "t2"), "t1"), "t2");
+    const handoff = handoffFromReviewedComparison(thoughtDraft);
+    expect(handoff?.selectedThoughts.map((item) => item.id)).toEqual(["t1", "t2"]);
+    expect(handoff?.selectedThoughts[0].linkedSituation?.stateToken).toBe("s1-token");
+    expect(handoff?.experienceRelations).toEqual({ t2: "differentExperiences" });
+    expect(handoffFromReviewedComparison(answered(chooseAnchor(draftWith("o1", "o2"), "o1"), "o2"))).toBeNull();
+    const component = readSource("src/components/SemanticComparison.tsx");
+    expect(component).toContain('reviewStatus === "reviewed"');
+    expect(component).toContain('draft.sourceType === "thought"');
+    expect(component).toContain("startCandidateAttempt(handoff");
+  });
+
   it("does not restore Reviewed after a user edit during the read or an invalidated source", () => {
     const draft = answered(chooseAnchor(draftWith("t1", "t2"), "t1"), "t2");
     expect(mayRestoreReviewedSummary(draft, true, false, 4, 4)).toBe(true);

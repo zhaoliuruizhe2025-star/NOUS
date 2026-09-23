@@ -218,6 +218,72 @@
       "loadFailed": "Current saved records could not be loaded. The previous summary is no longer current."
     }
   },
+  "systemCandidate": {
+    "begin": "Check for a Thought Candidate",
+    "eyebrow": "Thought review",
+    "title": "User-grounded Thought Candidate",
+    "intro": "Define one Thought content, then mark every selected Thought against it. NOUS checks only whether your markings establish a bounded cross-experience conclusion.",
+    "notSaved": "This analysis and any proposal are temporary and are not saved.",
+    "frameLabel": "Your comparison frame",
+    "xLabel": "User-defined Thought content",
+    "xGuidance": "Use your own words. Changing this text clears all markings for this content.",
+    "scopeTitle": "Thought records reviewed here",
+    "scopeIntro": "Mark every selected Thought. A linked situation supplies context, not another occurrence.",
+    "anchor": "Anchor Thought",
+    "thought": "Thought",
+    "context": "Linked situation context",
+    "noContext": "No linked situation",
+    "classificationQuestion": "Does this record contain the Thought content you defined?",
+    "classifications": {
+      "unanswered": "Unanswered",
+      "present": "Present",
+      "absent": "Absent",
+      "cannotTell": "Cannot tell"
+    },
+    "experience": {
+      "sameOrPossiblySame": "Same or possibly same experience",
+      "differentExperiences": "Different experiences, as you identified",
+      "cannotTell": "Cannot tell whether experiences differ"
+    },
+    "checking": "Checking all selected current records…",
+    "errors": {
+      "subjectInvariant": "The local user record is inconsistent, so current records could not be checked.",
+      "dataInconsistent": "Saved records are inconsistent, so this analysis cannot check them safely.",
+      "storageUnavailable": "Local storage is not ready. This is not a zero Candidate result.",
+      "loadFailed": "Current saved records could not be loaded. This is not a zero Candidate result."
+    },
+    "zeroTitle": "0 Candidates from these markings",
+    "zeroReasons": {
+      "anchorNotPresent": "You did not mark the Anchor Thought as present for this content.",
+      "insufficientPresent": "Fewer than two reviewed Thought records were marked present.",
+      "noDifferentExperiencePair": "No present Thought was marked as a different experience from the present Anchor Thought."
+    },
+    "zeroLimit": "This does not establish that the content never occurs or that a broader claim is false.",
+    "proposalTitle": "Candidate proposed by NOUS",
+    "conclusion": "Based on your record-by-record markings, within the Thought records reviewed here, this content appears in records from at least two experiences you identified as different.",
+    "atLeastTwoOnly": "This establishes a lower bound of two user-identified different experiences; other pairs were not compared.",
+    "whyTitle": "Why NOUS proposed this",
+    "proofIntro": "These present Thought records were marked as different experiences from the Anchor:",
+    "presentWithoutDistinct": "These other present Thoughts do not increase the proven experience lower bound:",
+    "limitsTitle": "Grounding and limits",
+    "absentSummary": "You marked the content absent in {count} reviewed record(s)",
+    "cannotTellSummary": "You could not tell in {count} reviewed record(s)",
+    "scopeLimit": "The claim applies only to this complete selected set of reviewed Thought records.",
+    "truthLimit": "The content and its presence are your descriptions, not independently verified facts.",
+    "dependenceLimit": "Different experiences do not establish statistically independent evidence.",
+    "timeLimit": "Record save order does not establish when these experiences occurred or any trend.",
+    "invalidation": "A change to any selected Thought or its linked context, the selected set, frame, anchor, this content, a marking, or a present Thought's experience relation requires a new review and explicit check.",
+    "mechanism": "Mechanism",
+    "expressionVersion": "Expression version",
+    "stale": "A selected source or its context changed or disappeared. Return to the comparison and review current records before starting a new analysis.",
+    "returnToComparison": "Return to comparison",
+    "dismissed": "Proposal dismissed for this session. Your markings remain available for an explicit new check.",
+    "incomplete": "Define the Thought content and explicitly mark every selected record before checking.",
+    "analyze": "Check whether these markings support a Candidate",
+    "returnToGrounding": "Return to markings",
+    "dismiss": "Dismiss this proposal",
+    "close": "Close Candidate review"
+  },
   "deletion": {
     "open": "Delete record",
     "title": "Permanently delete this record?",

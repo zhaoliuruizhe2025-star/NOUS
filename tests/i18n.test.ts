@@ -103,6 +103,22 @@ describe("localization", () => {
     expect(getMessages("zh-CN").semanticComparison.limitations).toContain("未推断其他记录之间的关系");
     expect(getMessages("en").semanticComparison.limitations).toContain("do not establish independent evidence");
     expect(getMessages("zh-CN").semanticComparison.limitations).toContain("不证明证据独立");
+    expect(Object.keys(getMessages("zh-CN").systemCandidate)).toEqual(Object.keys(getMessages("en").systemCandidate));
+    for (const key of ["classifications", "experience", "errors", "zeroReasons"] as const) {
+      expect(Object.keys(getMessages("zh-CN").systemCandidate[key])).toEqual(
+        Object.keys(getMessages("en").systemCandidate[key]),
+      );
+    }
+    expect(getMessages("en").systemCandidate.xLabel).toBe("User-defined Thought content");
+    expect(getMessages("zh-CN").systemCandidate.xLabel).toBe("用户定义的想法内容");
+    expect(getMessages("en").systemCandidate.conclusion).toContain("at least two experiences you identified as different");
+    expect(getMessages("zh-CN").systemCandidate.conclusion).toContain("至少两段你标为不同的经历");
+    expect(getMessages("en").systemCandidate.conclusion).toContain("within the Thought records reviewed here");
+    expect(getMessages("zh-CN").systemCandidate.conclusion).toContain("在本次审阅的想法记录中");
+    expect(getMessages("en").systemCandidate.cannotTellSummary).toContain("could not tell");
+    expect(getMessages("zh-CN").systemCandidate.cannotTellSummary).toContain("无法判断");
+    expect(JSON.stringify(getMessages("en").systemCandidate)).not.toMatch(/\bPattern\b|\btendency\b|\balways\b|\bconfidence\b/i);
+    expect(JSON.stringify(getMessages("zh-CN").systemCandidate)).not.toMatch(/模式|倾向|总是|置信/);
   });
 
   it("selects Simplified Chinese for Chinese browser locales", () => {
