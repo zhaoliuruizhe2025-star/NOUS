@@ -660,6 +660,39 @@ textarea {
 .semantic-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
 .semantic-card :is(button, select, textarea, input):focus-visible { outline: 2px solid #6f867d; outline-offset: 2px; }
 
+.system-candidate-card {
+  margin-top: 32px;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid rgb(64 82 75 / 20%);
+  border-radius: 20px;
+  background: rgb(246 248 244 / 90%);
+}
+.system-candidate-card h2 { margin-top: 0; }
+.system-candidate-card h3 { margin-bottom: 8px; }
+.system-candidate-card p { line-height: 1.6; }
+.system-candidate-limit,
+.system-candidate-meta { color: #66726d; font-size: 0.9rem; }
+.system-candidate-user-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.system-candidate-x,
+.system-candidate-sources label { display: grid; gap: 8px; font-weight: 600; }
+.system-candidate-x textarea,
+.system-candidate-sources select {
+  width: 100%;
+  border: 1px solid #cbd0c9;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #26312e;
+  background: #fff;
+  font-weight: 400;
+}
+.system-candidate-x textarea { resize: vertical; line-height: 1.55; }
+.system-candidate-sources { padding-left: 22px; }
+.system-candidate-sources li,
+.system-candidate-result { margin: 14px 0; padding: 18px; border-radius: 14px; background: rgb(238 241 236 / 80%); }
+.system-candidate-sources li p { margin: 8px 0; }
+.system-candidate-sources select { max-width: 440px; }
+.system-candidate-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 24px; }
+
 @media (max-width: 560px) {
   .app-header {
     align-items: flex-start;

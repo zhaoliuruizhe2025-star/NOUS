@@ -2,6 +2,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { loadStructuredHistory, type StructuredHistoryCommandError } from "../app/history";
 import {
+  candidateRequestIsCurrent,
+  changedScopeSources,
+  deriveCandidate,
+  dismissCandidate,
+  editClassification,
+  editX,
+  failCandidateLoad,
+  finishChecking,
+  handoffFromReviewedComparison,
+  readyForCandidateAnalysis,
+  restoreCheckedResult,
+  returnToGrounding,
+  staleCandidate,
+  startCandidateAttempt,
+  startChecking,
+  syncComparisonEdit,
+  type CandidateState,
+} from "../app/thought_recurrence_candidate";
+import {
   addSource,
   answerComparability,
   answerExperience,
@@ -24,9 +43,10 @@ import {
   type MeaningRelation,
 } from "../app/semantic_comparison";
 import type { Messages } from "../i18n";
+import { SystemCandidateReview } from "./SystemCandidateReview";
 
 type ReviewStatus = "draft" | "checking" | "reviewed" | "stale";
-type RefreshPurpose = "entry" | "review" | "focus";
+type RefreshPurpose = "entry" | "review" | "focus" | "candidateAnalyze";
 type LoadError = "subjectInvariant" | "dataInconsistent" | "storageUnavailable" | "loadFailed";
 
 function loadErrorCode(error: unknown): LoadError {
@@ -61,7 +81,10 @@ export function SemanticComparison({ messages, onClose }: {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("draft");
+  const [candidate, setCandidate] = useState<CandidateState>({ kind: "closed" });
   const draftRef = useRef(draft);
+  const candidateRef = useRef(candidate);
+  const candidateAttemptRef = useRef(0);
   const reviewStatusRef = useRef(reviewStatus);
   const editVersionRef = useRef(0);
   const gateRef = useRef(createComparisonRefreshGate());
@@ -76,10 +99,17 @@ export function SemanticComparison({ messages, onClose }: {
     setReviewStatus(next);
   }
 
+  function publishCandidate(next: CandidateState) {
+    candidateRef.current = next;
+    setCandidate(next);
+  }
+
   function edit(update: (current: ComparisonDraft) => ComparisonDraft) {
-    const next = update(draftRef.current);
-    if (next === draftRef.current) return;
+    const previous = draftRef.current;
+    const next = update(previous);
+    if (next === previous) return;
     editVersionRef.current += 1;
+    publishCandidate(syncComparisonEdit(candidateRef.current, previous, next));
     publishDraft(next);
     publishStatus("draft");
   }
@@ -88,6 +118,19 @@ export function SemanticComparison({ messages, onClose }: {
     const gate = gateRef.current;
     const request = gate.start();
     const editVersion = editVersionRef.current;
+    const beforeCandidate = candidateRef.current;
+    const canAnalyze = purpose === "candidateAnalyze" && readyForCandidateAnalysis(beforeCandidate);
+    if (purpose === "candidateAnalyze" && !canAnalyze) return;
+    if (canAnalyze) {
+      publishCandidate(startChecking(beforeCandidate, "analyze", request));
+    } else if (beforeCandidate.kind === "proposed" || beforeCandidate.kind === "zeroResult" ||
+        beforeCandidate.kind === "checking") {
+      publishCandidate(startChecking(beforeCandidate, "focus", request));
+    }
+    const candidateAtRequest = candidateRef.current;
+    const checkIdentity = candidateAtRequest.kind !== "closed" && candidateAtRequest.kind !== "stale"
+      ? { attemptId: candidateAtRequest.attemptId, revision: candidateAtRequest.revision }
+      : null;
     const restoreReview = purpose === "review"
       || reviewStatusRef.current === "reviewed"
       || reviewStatusRef.current === "checking";
@@ -100,16 +143,48 @@ export function SemanticComparison({ messages, onClose }: {
       const history = await loadStructuredHistory();
       if (!gate.isCurrent(request)) return;
       const currentSources = projectComparisonSources(history);
+      const currentCandidate = candidateRef.current;
+      let candidateSourceChanged = false;
+      let changedCandidateIds: readonly string[] = [];
+      if (checkIdentity && currentCandidate.kind !== "closed" && currentCandidate.kind !== "stale" &&
+          currentCandidate.attemptId === checkIdentity.attemptId && currentCandidate.revision === checkIdentity.revision) {
+        const changed = changedScopeSources(currentCandidate.handoff, currentSources);
+        if (changed) {
+          candidateSourceChanged = true;
+          changedCandidateIds = changed.affectedIds;
+          publishCandidate(staleCandidate(changed.reason, changed.affectedIds));
+        }
+        else if (checkIdentity && candidateRequestIsCurrent(currentCandidate, request, checkIdentity.attemptId, checkIdentity.revision)) {
+          publishCandidate(currentCandidate.purpose === "analyze"
+            ? finishChecking(currentCandidate, deriveCandidate(currentCandidate, request))
+            : restoreCheckedResult(currentCandidate));
+        }
+      }
+      if (editVersion !== editVersionRef.current) return;
       const reconciled = reconcileComparison(draftRef.current, currentSources);
-      draftRef.current = reconciled.draft;
-      setDraft(reconciled.draft);
+      // Task 015 normally detects state-token changes. Also revoke an answer if
+      // the defensive content/context check found a change without a new token.
+      const changedIds = new Set(changedCandidateIds);
+      const anchorChanged = reconciled.draft.anchorId !== null && changedIds.has(reconciled.draft.anchorId);
+      const nextDraft: ComparisonDraft = candidateSourceChanged ? {
+        ...reconciled.draft,
+        selectedRecords: reconciled.draft.selectedRecords.map((selected) =>
+          selected.status === "current" && changedIds.has(selected.source.id)
+            ? { status: "stale" as const, recordType: selected.source.recordType, id: selected.source.id, reason: "sourceChanged" as const }
+            : selected),
+        anchorId: anchorChanged ? null : reconciled.draft.anchorId,
+        comparisons: anchorChanged ? {} : Object.fromEntries(Object.entries(reconciled.draft.comparisons)
+          .filter(([id]) => !changedIds.has(id))),
+      } : reconciled.draft;
+      draftRef.current = nextDraft;
+      setDraft(nextDraft);
       setSources(currentSources);
       setLoadError(null);
       setLoading(false);
-      const nextStatus: ReviewStatus = reconciled.changed
+      const nextStatus: ReviewStatus = reconciled.changed || candidateSourceChanged
         ? "stale"
         : mayRestoreReviewedSummary(
-          reconciled.draft, restoreReview, reconciled.changed, editVersion, editVersionRef.current,
+          nextDraft, restoreReview, reconciled.changed, editVersion, editVersionRef.current,
         )
           ? "reviewed"
           : "draft";
@@ -117,6 +192,11 @@ export function SemanticComparison({ messages, onClose }: {
       setReviewStatus(nextStatus);
     } catch (error) {
       if (!gate.isCurrent(request)) return;
+      const currentCandidate = candidateRef.current;
+      if (checkIdentity && candidateRequestIsCurrent(currentCandidate, request, checkIdentity.attemptId, checkIdentity.revision)) {
+        publishCandidate(failCandidateLoad(currentCandidate, loadErrorCode(error)));
+      }
+      if (editVersion !== editVersionRef.current) return;
       setSources(null);
       setLoadError(loadErrorCode(error));
       setLoading(false);
@@ -139,8 +219,15 @@ export function SemanticComparison({ messages, onClose }: {
 
   function clearComparison() {
     editVersionRef.current += 1;
+    publishCandidate({ kind: "closed" });
     publishDraft(emptyComparison());
     publishStatus("draft");
+  }
+
+  function leaveComparison() {
+    gateRef.current.dispose();
+    publishCandidate({ kind: "closed" });
+    onClose();
   }
 
   const available = sources?.filter((source) => source.recordType === draft.sourceType) ?? [];
@@ -344,9 +431,28 @@ export function SemanticComparison({ messages, onClose }: {
             );
           })}</ul>
           <p className="semantic-limitations">{copy.limitations}</p>
+          {draft.sourceType === "thought" && (
+            <button type="button" className="secondary-button" onClick={() => {
+              const handoff = handoffFromReviewedComparison(draftRef.current);
+              if (handoff) publishCandidate(startCandidateAttempt(handoff, ++candidateAttemptRef.current));
+            }}>{messages.systemCandidate.begin}</button>
+          )}
           <button type="button" className="secondary-button" onClick={() => publishStatus("draft")}>{copy.continueEditing}</button>
         </section>
       )}
+
+      <SystemCandidateReview
+        state={candidate}
+        messages={messages}
+        onXChange={(value) => publishCandidate(editX(candidateRef.current, value))}
+        onClassificationChange={(id, answer) => publishCandidate(editClassification(candidateRef.current, id, answer))}
+        onAnalyze={() => {
+          if (readyForCandidateAnalysis(candidateRef.current)) void refresh("candidateAnalyze");
+        }}
+        onDismiss={() => publishCandidate(dismissCandidate(candidateRef.current))}
+        onReturn={() => publishCandidate(returnToGrounding(candidateRef.current))}
+        onClose={() => publishCandidate({ kind: "closed" })}
+      />
 
       <div className="semantic-actions">
         <button
@@ -356,7 +462,7 @@ export function SemanticComparison({ messages, onClose }: {
           onClick={() => void refresh("review")}
         >{copy.review}</button>
         <button type="button" className="secondary-button" onClick={clearComparison}>{copy.clear}</button>
-        <button type="button" className="text-button" onClick={onClose}>{copy.close}</button>
+        <button type="button" className="text-button" onClick={leaveComparison}>{copy.close}</button>
       </div>
     </section>
   );

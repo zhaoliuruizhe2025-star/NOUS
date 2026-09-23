@@ -218,6 +218,72 @@
       "loadFailed": "无法读取当前已保存的记录。先前的摘要不再视为当前有效。"
     }
   },
+  "systemCandidate": {
+    "begin": "检查是否形成想法候选结论",
+    "eyebrow": "想法审阅",
+    "title": "由用户界定的想法候选结论",
+    "intro": "请定义一项想法内容，并逐条标注所有选中的想法。NOUS 只检查这些标注是否支持一个有边界的跨经历结论。",
+    "notSaved": "本次分析及可能提出的候选结论只是临时内容，不会保存。",
+    "frameLabel": "你的比较角度",
+    "xLabel": "用户定义的想法内容",
+    "xGuidance": "请用你自己的话描述。修改这段文字会清除针对它的全部标注。",
+    "scopeTitle": "本次审阅的想法记录",
+    "scopeIntro": "请标注每条选中的想法。关联情境仅提供背景，不算另一处出现。",
+    "anchor": "锚点想法",
+    "thought": "想法",
+    "context": "关联情境背景",
+    "noContext": "未关联情境",
+    "classificationQuestion": "这条记录是否包含你定义的想法内容？",
+    "classifications": {
+      "unanswered": "未回答",
+      "present": "存在",
+      "absent": "不存在",
+      "cannotTell": "无法判断"
+    },
+    "experience": {
+      "sameOrPossiblySame": "同一次或可能是同一次经历",
+      "differentExperiences": "你标为不同的经历",
+      "cannotTell": "无法判断经历是否不同"
+    },
+    "checking": "正在核对所有选中的当前记录……",
+    "errors": {
+      "subjectInvariant": "本地用户记录不一致，无法核对当前记录。",
+      "dataInconsistent": "已保存的记录不一致，无法安全核对本次分析。",
+      "storageUnavailable": "本地存储尚未就绪；这不代表结果为 0 个候选结论。",
+      "loadFailed": "无法读取当前已保存的记录；这不代表结果为 0 个候选结论。"
+    },
+    "zeroTitle": "根据这些标注，候选结论为 0 个",
+    "zeroReasons": {
+      "anchorNotPresent": "你没有把这项内容在锚点想法中标为存在。",
+      "insufficientPresent": "本次审阅中，标为存在的想法记录不足两条。",
+      "noDifferentExperiencePair": "不存在一条标为存在、且被你标为与锚点属于不同经历的想法记录。"
+    },
+    "zeroLimit": "这并不表示该内容从未出现，也不表示更广泛的说法是假的。",
+    "proposalTitle": "NOUS 提出的候选结论",
+    "conclusion": "根据你的逐条标注，在本次审阅的想法记录中，这一内容出现在至少两段你标为不同的经历所对应的记录里。",
+    "atLeastTwoOnly": "这里只能证明至少两段由你标为不同的经历；其他记录之间并未两两比较。",
+    "whyTitle": "NOUS 为什么提出这个结论",
+    "proofIntro": "这些被标为存在的想法记录，被你标为与锚点属于不同经历：",
+    "presentWithoutDistinct": "以下其他标为存在的想法不会提高已证明的经历数下限：",
+    "limitsTitle": "标注依据与限制",
+    "absentSummary": "你将这项内容在另外 {count} 条审阅记录中标为不存在",
+    "cannotTellSummary": "你对另外 {count} 条审阅记录无法判断",
+    "scopeLimit": "结论只适用于本次选中并审阅的完整想法记录集合。",
+    "truthLimit": "内容及其是否存在均来自你的描述，并非独立核实的事实。",
+    "dependenceLimit": "不同经历不等于统计上独立的证据。",
+    "timeLimit": "保存顺序不能说明这些经历发生的时间，也不能说明变化趋势。",
+    "invalidation": "任何选中想法或其关联背景、选中集合、比较角度、锚点、这项内容、逐条标注，或标为存在的想法与锚点的经历关系发生变化，都需要重新审阅并明确发起检查。",
+    "mechanism": "机制",
+    "expressionVersion": "表述版本",
+    "stale": "一条选中的来源或其背景已变化或不存在。请返回比较流程，审阅当前记录，再开始新的分析。",
+    "returnToComparison": "返回比较流程",
+    "dismissed": "本次会话中已收起该候选结论。你的标注仍可用于下一次明确发起的检查。",
+    "incomplete": "请定义想法内容，并明确标注每条选中的记录，然后再检查。",
+    "analyze": "检查这些标注是否支持候选结论",
+    "returnToGrounding": "返回标注",
+    "dismiss": "收起这项候选结论",
+    "close": "关闭候选结论审阅"
+  },
   "deletion": {
     "open": "删除记录",
     "title": "永久删除这条记录？",
