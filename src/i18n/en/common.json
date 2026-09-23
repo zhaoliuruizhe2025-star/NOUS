@@ -18,7 +18,8 @@
     "capture": "Capture",
     "history": "Saved records",
     "portability": "Export and backup",
-    "candidate": "Candidate review"
+    "candidate": "Candidate review",
+    "comparison": "Compare records"
   },
   "capture": {
     "eyebrow": "Remember",
@@ -82,6 +83,74 @@
       "dataInconsistent": "Some saved records are inconsistent, so this view could not be loaded safely.",
       "storageUnavailable": "Local storage is not ready.",
       "loadFailed": "Saved records could not be loaded."
+    }
+  },
+  "semanticComparison": {
+    "eyebrow": "Connect · Your comparison",
+    "title": "Compare records",
+    "intro": "Choose saved thoughts or experienced details, then describe how each selected record relates to one record you choose as the starting point. These are your judgments for this comparison only.",
+    "notSaved": "This comparison is not saved. Leaving this view or reloading the app discards it.",
+    "modeLabel": "Choose one record type",
+    "sourceTypes": {
+      "thought": "Thoughts",
+      "observation": "Experienced details"
+    },
+    "frameLabel": "What are you comparing?",
+    "frameGuidance": "Write the angle for this comparison. Editing it after you answer a question clears those answers; your selected records remain.",
+    "sourcesTitle": "Choose current saved records",
+    "loading": "Loading current saved records…",
+    "retry": "Try again",
+    "chooseMode": "Choose Thoughts or Experienced details to see available records.",
+    "noThoughts": "No saved thoughts are available for this comparison yet.",
+    "noObservations": "No saved experienced details are available for this comparison yet.",
+    "linkedSituation": "Linked situation context",
+    "noLinkedSituation": "No linked situation context",
+    "anchorLabel": "Record to compare others with",
+    "staleNotice": "A selected record changed. Its earlier content and answers are no longer used. Select the current record again to compare it.",
+    "sourceChanged": "Selected record changed",
+    "removeStale": "Remove old selection",
+    "needAnother": "Select at least one more record to compare.",
+    "questionsTitle": "Your comparisons",
+    "anchorIntro": "Compare each record below only with this starting record:",
+    "anchorRelation": "Starting record ↔ this record",
+    "comparabilityQuestion": "Does comparing these records make sense under your chosen angle?",
+    "comparability": {
+      "comparable": "Comparable for this comparison",
+      "notComparable": "Not comparable for this comparison",
+      "cannotTell": "Cannot tell"
+    },
+    "meaningQuestion": "In this respect, how do their expressed meanings relate?",
+    "meaning": {
+      "similar": "Similar in this respect",
+      "materiallyDifferent": "Materially different in this respect",
+      "cannotTell": "Cannot tell"
+    },
+    "experienceQuestion": "Might these records describe the same underlying experience?",
+    "experience": {
+      "sameOrPossiblySame": "Same or possibly same experience",
+      "differentExperiences": "Different experiences",
+      "cannotTell": "Cannot tell"
+    },
+    "unanswered": "Not answered",
+    "checking": "Checking current records…",
+    "summaryInvalid": "The earlier reviewed summary is no longer current. Review the current records and your remaining answers before reviewing again.",
+    "incomplete": "Choose a starting record and answer each applicable question before reviewing a summary. ‘Cannot tell’ is a complete answer.",
+    "summaryTitle": "Your structured comparison",
+    "sourceTypeLabel": "Record type",
+    "comparisonsTitle": "Each comparison with the starting record",
+    "comparabilityLabel": "You marked comparability",
+    "meaningLabel": "You marked meaning",
+    "experienceLabel": "You marked experience",
+    "limitations": "These are your judgments under this comparison angle, using only the selected records. Each relation is with the starting record; no relation among the other records was inferred. Different experiences do not establish independent evidence. NOUS inferred no recurrence, Candidate, Pattern, cause, confidence, or event chronology. This comparison is not saved.",
+    "continueEditing": "Continue editing",
+    "review": "Review comparison",
+    "clear": "Clear comparison",
+    "close": "Close",
+    "errors": {
+      "subjectInvariant": "The local user record is inconsistent, so current records could not be loaded.",
+      "dataInconsistent": "Saved records are inconsistent, so this comparison cannot load them safely.",
+      "storageUnavailable": "Local storage is not ready.",
+      "loadFailed": "Current saved records could not be loaded. The previous summary is no longer current."
     }
   },
   "candidateReview": {
